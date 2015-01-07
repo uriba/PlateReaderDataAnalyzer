@@ -10,7 +10,7 @@ shinyUI(fluidPage(
       ),
     mainPanel(
       plotOutput("odPlot"),
-      plotOutput("odLogPlot")
+      plotOutput("platePlot")
       )
     )
   ))
