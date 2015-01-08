@@ -1,15 +1,18 @@
 library(shiny)
 library(gdata)
 library(ggplot2)
+library(reshape2)
 
 valuesFromRow <- function(row) {
   row <- as.numeric(row)
   row <- row[!is.na(row)]
   return(row[-1])
 }
-
+getLabels <- function(df) {
+  return (as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1]))
+}
 labelRowsRange <- function(df,label) {
-  labels <- as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1])
+  labels <- getLabels(df)
   labels[length(labels)+1] <- "End.Time:"
   nextLabel = labels[which(labels==label)+1]
   
@@ -19,7 +22,19 @@ labelRowsRange <- function(df,label) {
 }
 
 getPlateByLabel <- function(df,label) {
-  return(df[labelRowsRange(df,label),])
+  plotData <- df[labelRowsRange(df,label),]
+  firstcol <- plotData[,1] # The first column contains the descriptors of the rows
+  plotData <- as.data.frame(t(plotData)) # Get the data to be in columns form
+  colnames(plotData) <- firstcol # Set the proper column names
+  plotData <- plotData[-1,] # Omit irrelevant columns and rows
+  plotData <- na.omit(plotData)
+  plotData[,1] = NULL
+  plotData[,2] = NULL
+  colnames(plotData)[1] <- "Time" #Rename the time column so that it has a "nicer" name
+  plotData[] <- lapply(plotData,as.character) # Convert values to numeric
+  plotData[] <- lapply(plotData,as.numeric) 
+  
+  return(plotData)
 }
 
 getTimes <- function(df,label) {
@@ -43,7 +58,7 @@ shinyServer(function(input,output) {
       return(NULL)
     df <- read.xls(inFile$datapath,stringsAsFactors=FALSE)
     df[df=="OVER"] <- "71000"
-    labels <- as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1])
+    labels <- getLabels(df)
     return(list(df = df, labels = labels))
   })
 
@@ -79,20 +94,8 @@ shinyServer(function(input,output) {
     if(is.null(input$datafile)) { return() }
     label <- input$label
     plotData <- getPlateByLabel(Data()$df,label)
-    firstcol <- plotData[,1]
-    plotData <- as.data.frame(t(plotData))
-    colnames(plotData) <- firstcol
-    plotData <- plotData[-1,]
-    plotData <- na.omit(plotData)
-    plotData[,1] = NULL
-    plotData[,2] = NULL
-    colnames(plotData)[1] <- "Time"
-    plotData[] <- lapply(plotData,as.character)
-    plotData[] <- lapply(plotData,as.numeric)
     
-    rownames(plotData) <- plotData$Time
-    ggplotdata <- melt(plotData,id="Time")
-    p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
-    print(p)
+    ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
+    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
   })
 })
