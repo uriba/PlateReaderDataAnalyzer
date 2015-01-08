@@ -3,17 +3,13 @@ library(gdata)
 library(ggplot2)
 library(reshape2)
 
-valuesFromRow <- function(row) {
-  row <- as.numeric(row)
-  row <- row[!is.na(row)]
-  return(row[-1])
-}
 getLabels <- function(df) {
   return (as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1]))
 }
+
 labelRowsRange <- function(df,label) {
   labels <- getLabels(df)
-  labels[length(labels)+1] <- "End.Time:"
+  labels[length(labels)+1] <- "End Time:"
   nextLabel = labels[which(labels==label)+1]
   
   labelRow <-as.numeric(rownames(df[df[,1]==label,]))
@@ -37,20 +33,6 @@ getPlateByLabel <- function(df,label) {
   return(plotData)
 }
 
-getTimes <- function(df,label) {
-  labelrow <-as.numeric(rownames(df[df[,1]==label,]))
-  times <- df[labelrow+2,]
-  return(valuesFromRow(times))
-}
-
-getWell <- function(df,well,label) {
-  labelRow <- as.numeric(rownames(df[as.numeric(rownames(df[df[,1]==label,])),]))
-  wellRows <- df[df[,1] == well,]
-  if(length(rownames(wellRows))==0) { return () }
-  wellRow <- wellRows[as.numeric(rownames(wellRows))>labelRow,][1,]
-  return(valuesFromRow(wellRow))
-}
-
 shinyServer(function(input,output) {
   Data <- reactive({
     inFile <- input$datafile
@@ -62,16 +44,6 @@ shinyServer(function(input,output) {
     return(list(df = df, labels = labels))
   })
 
-  WellSeries <- reactive({
-    if(is.null(input$datafile)) { return() }
-    df <- Data()$df    
-    label <- input$label
-    if(label == "") { return() } 
-    times <- as.numeric(getTimes(df,label))
-    values <- getWell(df,input$well,label)
-    return(list(times = times, values = values))
-  })
-  
   output$labelSelect <- renderUI({ selectInput(
     inputId = "label",
     label = "Select label to display",
@@ -80,14 +52,14 @@ shinyServer(function(input,output) {
   })
   
   output$odPlot <- renderPlot({
-    if(is.null(WellSeries()$values)) { return() }
-    times <- WellSeries()$times
-    values <- WellSeries()$values
+    if(is.null(input$datafile)) { return() }
     label <- input$label
-    plot(times,values-input$background,
-         type = "l",main = input$well,
-         xlab = "Time [sec]", ylab = label,
-         ylim  = c(0,max(values)))
+    plotData <- getPlateByLabel(Data()$df,label)
+    cols <- c("Time",input$well)
+    plotData <- plotData[,cols]
+
+    ggplotdata <- melt(plotData,id="Time")
+    ggplot(data=ggplotdata,aes(x=Time,y=value))+geom_line()
   })
   
   output$platePlot <- renderPlot({   
