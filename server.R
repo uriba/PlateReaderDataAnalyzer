@@ -22,10 +22,6 @@ getPlateByLabel <- function(df,label) {
   return(df[labelRowsRange(df,label),])
 }
 
-transposePlateData <- function(pd) {
-  pd <- as.data.frame(t())
-}
-
 getTimes <- function(df,label) {
   labelrow <-as.numeric(rownames(df[df[,1]==label,]))
   times <- df[labelrow+2,]
@@ -88,21 +84,15 @@ shinyServer(function(input,output) {
     colnames(plotData) <- firstcol
     plotData <- plotData[-1,]
     plotData <- na.omit(plotData)
-    #x <- as.matrix(plotData)
-    #mode(x) <- "numeric"
-    #plotData <- cbind(plotData,RTot=rowSums(x,na.rm=TRUE))
+    plotData[,1] = NULL
+    plotData[,2] = NULL
+    colnames(plotData)[1] <- "Time"
+    plotData[] <- lapply(plotData,as.character)
+    plotData[] <- lapply(plotData,as.numeric)
     
-    colnames(plotData)[2] <- "Time"
-    rownames(plotData) <- as.double(plotData$Time)
-    
-    #plotData[,"Time [s]"] <- as.numeric(plotData[,"Time [s]"])
-    #plotData[,"A1"] <- as.numeric(plotData[,"A1"])
-    #print(plotData[,"Time [s]"])
-    #print(plotData[,"A1"])
-    #plot(as.vector(x),as.vector(y))
-    print(typeof(plotData$Time))
-    #print(plotData$A1)
-    p <- ggplot(aes(x=Time,y=A1),data=plotData)+geom_line()
+    rownames(plotData) <- plotData$Time
+    ggplotdata <- melt(plotData,id="Time")
+    p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
     print(p)
   })
 })
