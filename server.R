@@ -62,7 +62,7 @@ shinyServer(function(input,output) {
     ggplot(data=ggplotdata,aes(x=Time,y=value))+geom_line()
   })
   
-  output$platePlot <- renderPlot({   
+  output$mainPlot <- renderPlot({   
     if(is.null(input$datafile)) { return() }
     label <- input$label
     plotData <- getPlateByLabel(Data()$df,label)
