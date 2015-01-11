@@ -3,22 +3,15 @@ library(gdata)
 library(ggplot2)
 library(reshape2)
 
-getLabels <- function(df) {
-  return (as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1]))
-}
-
-labelRowsRange <- function(df,label) {
-  labels <- getLabels(df)
-  labels[length(labels)+1] <- "End Time:"
-  nextLabel = labels[which(labels==label)+1]
-  
+labelSubset <- function(df,label) {
   labelRow <-as.numeric(rownames(df[df[,1]==label,]))
-  nextLabelRow <- as.numeric(rownames(df[df[,1]==nextLabel,]))
-  return((labelRow+1):(nextLabelRow-1))
+  fromLabel <- df[-(1:labelRow),]
+  endRow <- as.numeric(rownames(fromLabel[fromLabel[,2]=="",]))[1]
+  return(df[(labelRow+1):(endRow-1),])
 }
 
 getPlateByLabel <- function(df,label) {
-  plotData <- df[labelRowsRange(df,label),]
+  plotData <- labelSubset(df,label)
   firstcol <- plotData[,1] # The first column contains the descriptors of the rows
   plotData <- as.data.frame(t(plotData)) # Get the data to be in columns form
   colnames(plotData) <- firstcol # Set the proper column names
@@ -28,9 +21,19 @@ getPlateByLabel <- function(df,label) {
   plotData[,2] = NULL
   colnames(plotData)[1] <- "Time" #Rename the time column so that it has a "nicer" name
   plotData[] <- lapply(plotData,as.character) # Convert values to numeric
-  plotData[] <- lapply(plotData,as.numeric) 
-  
+  plotData[] <- lapply(plotData,as.numeric)
   return(plotData)
+}
+
+getReaderData.1.8 <- function(df) {
+  df[df=="OVER"] <- "71000"
+  labels <- as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1]) #in this version labels are two lines above measurement tables
+  measurements <- vector(mode = "list", length = length(labels))
+  names(measurements) <- labels
+  for (label in labels) {
+    measurements[[label]] <- getPlateByLabel(df,label)
+  }
+  return(measurements)  
 }
 
 shinyServer(function(input,output) {
@@ -38,10 +41,18 @@ shinyServer(function(input,output) {
     inFile <- input$datafile
     if (is.null(inFile))
       return(NULL)
-    df <- read.xls(inFile$datapath,stringsAsFactors=FALSE)
-    df[df=="OVER"] <- "71000"
-    labels <- getLabels(df)
-    return(list(df = df, labels = labels))
+    df <- read.xls(inFile$datapath,stringsAsFactors=FALSE,header=FALSE)
+    version <- df[1,]
+    version <- version[version != ""]
+    version <- version[!is.na(version)]
+    version <- version[2]
+    print(version)
+    if(version == 'Tecan i-control , 1.8.50.0') {
+      return(getReaderData.1.8(df))
+    }
+    if(version == 'Tecan i-control , 1.11.1.0') {
+      return(NULL)
+    }
   })
   
   output$fileUploaded <- reactive ({
@@ -53,14 +64,14 @@ shinyServer(function(input,output) {
   output$labelSelect <- renderUI({ selectInput(
     inputId = "label",
     label = "Select label to display",
-    choices = Data()$labels,
+    choices = names(Data()),
     selected = 1)
   })
   
   output$mainPlot <- renderPlot({   
     if(is.null(input$datafile)) { return() }
     label <- input$label
-    plotData <- getPlateByLabel(Data()$df,label)
+    plotData <- Data()[input$label]
     if(input$wellsToAnalyse == "Well") {
       cols <- c("Time",input$well)
       plotData <- plotData[,cols]
