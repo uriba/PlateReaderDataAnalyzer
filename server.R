@@ -43,6 +43,12 @@ shinyServer(function(input,output) {
     labels <- getLabels(df)
     return(list(df = df, labels = labels))
   })
+  
+  output$fileUploaded <- reactive ({
+    return (! is.null(Data()))
+  })
+  
+  outputOptions(output,'fileUploaded',suspendWhenHidden=FALSE)
 
   output$labelSelect <- renderUI({ selectInput(
     inputId = "label",
@@ -51,21 +57,14 @@ shinyServer(function(input,output) {
     selected = 1)
   })
   
-  output$odPlot <- renderPlot({
-    if(is.null(input$datafile)) { return() }
-    label <- input$label
-    plotData <- getPlateByLabel(Data()$df,label)
-    cols <- c("Time",input$well)
-    plotData <- plotData[,cols]
-
-    ggplotdata <- melt(plotData,id="Time")
-    ggplot(data=ggplotdata,aes(x=Time,y=value))+geom_line()
-  })
-  
   output$mainPlot <- renderPlot({   
     if(is.null(input$datafile)) { return() }
     label <- input$label
     plotData <- getPlateByLabel(Data()$df,label)
+    if(input$wellsToAnalyse == "Well") {
+      cols <- c("Time",input$well)
+      plotData <- plotData[,cols]
+    }
     
     ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
