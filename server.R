@@ -12,9 +12,16 @@ labelSubset <- function(df,label) {
 
 getPlateByLabel <- function(df,label) {
   plotData <- labelSubset(df,label)
-  firstcol <- plotData[,1] # The first column contains the descriptors of the rows
-  plotData <- as.data.frame(t(plotData)) # Get the data to be in columns form
-  colnames(plotData) <- firstcol # Set the proper column names
+  if(dataInRows(plotData)) {
+    print("data in rows")
+    firstcol <- plotData[,1] # The first column contains the descriptors of the rows
+    plotData <- as.data.frame(t(plotData)) # Get the data to be in columns form
+    colnames(plotData) <- firstcol # Set the proper column names
+  } else {
+    print("data in columns")
+    colnames(plotData) <- plotData[1,]
+  }
+  print(colnames(plotData))
   plotData <- plotData[-1,] # Omit irrelevant columns and rows
   plotData <- na.omit(plotData)
   plotData[,1] = NULL
@@ -23,6 +30,10 @@ getPlateByLabel <- function(df,label) {
   plotData[] <- lapply(plotData,as.character) # Convert values to numeric
   plotData[] <- lapply(plotData,as.numeric)
   return(plotData)
+}
+
+dataInRows <- function(df) {
+  return(length(colnames((df[df[,1]=='A1']))) > 0)
 }
 
 getReaderData.1.8 <- function(df) {
@@ -50,6 +61,9 @@ shinyServer(function(input,output) {
     if(version == 'Tecan i-control , 1.8.50.0') {
       return(getReaderData.1.8(df))
     }
+    if(version == 'Tecan i-control , 1.10.4.0') {
+      return(getReaderData.1.8(df))
+    }    
     if(version == 'Tecan i-control , 1.11.1.0') {
       return(NULL)
     }
@@ -107,10 +121,8 @@ shinyServer(function(input,output) {
     
     if(input$wellsToAnalyse == "Column") {
       cols <- c("Time",colnames(plotData)[grep(paste0("[A-Z]",input$column,"$"),colnames(plotData))])      
-    }
-    
+    }  
     plotData <- plotData[,cols]
-  
   
     ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
