@@ -68,15 +68,50 @@ shinyServer(function(input,output) {
     selected = 1)
   })
   
+  output$rowSelect <- renderUI({
+    if(is.null(input$datafile)) { return() }
+    plotData <- Data()[[input$label]]
+    rows <- levels(factor(substring(colnames(plotData)[-1],1,1)))
+    selectInput(
+    inputId = "row",
+    label = "Select row to display",
+    choices = rows,
+    selected = 1)
+  })
+  
+  output$columnSelect <- renderUI({
+    if(is.null(input$datafile)) { return() }
+    plotData <- Data()[[input$label]]
+    columns <- levels(factor(substring(colnames(plotData)[-1],2)))
+    print(columns)
+    selectInput(
+      inputId = "column",
+      label = "Select column to display",
+      choices = columns,
+      selected = 1)
+  })
+  
   output$mainPlot <- renderPlot({   
     if(is.null(input$datafile)) { return() }
     label <- input$label
-    plotData <- Data()[input$label]
+    plotData <- Data()[[input$label]]
+    cols <- c(colnames(plotData))
+    
     if(input$wellsToAnalyse == "Well") {
       cols <- c("Time",input$well)
-      plotData <- plotData[,cols]
     }
     
+    if(input$wellsToAnalyse == "Row") {
+      cols <- c("Time",colnames(plotData)[grep(input$row,colnames(plotData))])
+    }
+    
+    if(input$wellsToAnalyse == "Column") {
+      cols <- c("Time",colnames(plotData)[grep(paste0("[A-Z]",input$column,"$"),colnames(plotData))])      
+    }
+    
+    plotData <- plotData[,cols]
+  
+  
     ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
   })
