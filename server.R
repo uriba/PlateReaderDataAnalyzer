@@ -5,6 +5,7 @@ library(reshape2)
 
 labelSubset <- function(df,label) {
   readings <- as.numeric(rownames(df[df[,1] == "Cycle Nr.",]))
+  endings <- as.numeric(rownames(df[df[,1] == "End Time:",]))
   print("readings:")
   print(readings)
   labelRow <- 0
@@ -14,16 +15,14 @@ labelSubset <- function(df,label) {
     labelRow <-as.numeric(rownames(df[df[,1]==label,]))
     print("labelRow:")
     print(labelRow)
+    endings <- as.numeric(rownames(df[df[,2] == "",]))
   } else {
     labelRow <- as.numeric(rownames(df[df[,1]==paste0("Label: ",label),]))
     print("labelRow:")
     print(labelRow)
   }
   fromRow <- readings[readings > labelRow][1]
-  print("fromRow:")
-  print(fromRow)
-  fromLabel <- df[-(1:fromRow),]
-  endRow <- as.numeric(rownames(fromLabel[fromLabel[,2]=="",]))[1]
+  endRow <- endings[endings>fromRow][1]
   return(df[(fromRow):(endRow-1),])
 }
 
@@ -38,7 +37,6 @@ getPlateByLabel <- function(df,label) {
     print("data in columns")
     colnames(plotData) <- plotData[1,]
   }
-  print(colnames(plotData))
   plotData <- plotData[-1,] # Omit irrelevant columns and rows
   plotData <- na.omit(plotData)
   plotData[,1] = NULL
