@@ -4,10 +4,25 @@ library(ggplot2)
 library(reshape2)
 
 labelSubset <- function(df,label) {
-  labelRow <-as.numeric(rownames(df[df[,1]==label,]))
-  fromLabel <- df[-(1:labelRow),]
+  readings <- as.numeric(rownames(df[df[,1] == "Cycle Nr.",]))
+  print("readings:")
+  print(readings)
+  labelRow <- 0
+  if(adjecantLabels(df)) {
+    labelRow <-as.numeric(rownames(df[df[,1]==label,]))
+    print("labelRow:")
+    print(labelRow)
+  } else {
+    labelRow <- as.numeric(rownames(df[df[,1]==paste0("Label: ",label)]))
+    print("labelRow:")
+    print(labelRow)
+  }
+  fromRow <- readings[readings > labelRow][1]
+  print("fromRow:")
+  print(fromRow)
+  fromLabel <- df[-(1:fromRow),]
   endRow <- as.numeric(rownames(fromLabel[fromLabel[,2]=="",]))[1]
-  return(df[(labelRow+1):(endRow-1),])
+  return(df[(fromRow):(endRow-1),])
 }
 
 getPlateByLabel <- function(df,label) {
@@ -35,10 +50,18 @@ getPlateByLabel <- function(df,label) {
 dataInRows <- function(df) {
   return(length(colnames((df[df[,1]=='A1']))) > 0)
 }
+adjecantLabels <- function(df) {
+  return(length(df[grep("^Label: ",df[,1]),1]) == 0)
+}
 
 getReaderData.1.8 <- function(df) {
   df[df=="OVER"] <- "71000"
-  labels <- as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1]) #in this version labels are two lines above measurement tables
+  labels <- df[grep("^Label: ",df[,1]),1]
+  labels <- substring(labels,8)
+  print(labels)
+  if(adjecantLabels(df)) {
+    labels <- as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1]) #in this version labels are two lines above measurement tables
+  }
   measurements <- vector(mode = "list", length = length(labels))
   names(measurements) <- labels
   for (label in labels) {
@@ -97,7 +120,6 @@ shinyServer(function(input,output) {
     if(is.null(input$datafile)) { return() }
     plotData <- Data()[[input$label]]
     columns <- levels(factor(substring(colnames(plotData)[-1],2)))
-    print(columns)
     selectInput(
       inputId = "column",
       label = "Select column to display",
