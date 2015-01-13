@@ -8,12 +8,14 @@ labelSubset <- function(df,label) {
   print("readings:")
   print(readings)
   labelRow <- 0
+  print("Label:")
+  print(label)
   if(adjecantLabels(df)) {
     labelRow <-as.numeric(rownames(df[df[,1]==label,]))
     print("labelRow:")
     print(labelRow)
   } else {
-    labelRow <- as.numeric(rownames(df[df[,1]==paste0("Label: ",label)]))
+    labelRow <- as.numeric(rownames(df[df[,1]==paste0("Label: ",label),]))
     print("labelRow:")
     print(labelRow)
   }
@@ -48,8 +50,9 @@ getPlateByLabel <- function(df,label) {
 }
 
 dataInRows <- function(df) {
-  return(length(colnames((df[df[,1]=='A1']))) > 0)
+  return(df[2,1] != "1")
 }
+
 adjecantLabels <- function(df) {
   return(length(df[grep("^Label: ",df[,1]),1]) == 0)
 }
@@ -88,7 +91,7 @@ shinyServer(function(input,output) {
       return(getReaderData.1.8(df))
     }    
     if(version == 'Tecan i-control , 1.11.1.0') {
-      return(NULL)
+      return(getReaderData.1.8(df))
     }
   })
   
