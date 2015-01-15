@@ -6,20 +6,12 @@ library(reshape2)
 labelSubset <- function(df,label) {
   readings <- as.numeric(rownames(df[df[,1] == "Cycle Nr.",]))
   endings <- as.numeric(rownames(df[df[,1] == "End Time:",]))
-  print("readings:")
-  print(readings)
   labelRow <- 0
-  print("Label:")
-  print(label)
   if(adjecantLabels(df)) {
     labelRow <-as.numeric(rownames(df[df[,1]==label,]))
-    print("labelRow:")
-    print(labelRow)
     endings <- as.numeric(rownames(df[df[,2] == "",]))
   } else {
     labelRow <- as.numeric(rownames(df[df[,1]==paste0("Label: ",label),]))
-    print("labelRow:")
-    print(labelRow)
   }
   fromRow <- readings[readings > labelRow][1]
   endRow <- endings[endings>fromRow][1]
@@ -37,10 +29,10 @@ getPlateByLabel <- function(df,label) {
     print("data in columns")
     colnames(plotData) <- plotData[1,]
   }
-  plotData <- plotData[-1,] # Omit irrelevant columns and rows
+  irrelevantCols <- colnames(plotData)[grep("^Cycle|^Temp|^O2|^CO2",colnames(plotData))]
+  plotData <- plotData[,!(names(plotData) %in% irrelevantCols)]
+  plotData <- plotData[-1,] # Omit headings row
   plotData <- na.omit(plotData)
-  plotData[,1] = NULL
-  plotData[,2] = NULL
   colnames(plotData)[1] <- "Time" #Rename the time column so that it has a "nicer" name
   plotData[] <- lapply(plotData,as.character) # Convert values to numeric
   plotData[] <- lapply(plotData,as.numeric)
@@ -55,14 +47,14 @@ adjecantLabels <- function(df) {
   return(length(df[grep("^Label: ",df[,1]),1]) == 0)
 }
 
-getReaderData.1.8 <- function(df) {
+getReaderData <- function(df) {
   df[df=="OVER"] <- "71000"
   labels <- df[grep("^Label: ",df[,1]),1]
   labels <- substring(labels,8)
-  print(labels)
   if(adjecantLabels(df)) {
     labels <- as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1]) #in this version labels are two lines above measurement tables
   }
+  print(labels)
   measurements <- vector(mode = "list", length = length(labels))
   names(measurements) <- labels
   for (label in labels) {
@@ -82,14 +74,10 @@ shinyServer(function(input,output) {
     version <- version[!is.na(version)]
     version <- version[2]
     print(version)
-    if(version == 'Tecan i-control , 1.8.50.0') {
-      return(getReaderData.1.8(df))
-    }
-    if(version == 'Tecan i-control , 1.10.4.0') {
-      return(getReaderData.1.8(df))
-    }    
-    if(version == 'Tecan i-control , 1.11.1.0') {
-      return(getReaderData.1.8(df))
+    if(substring(version,1,15) == 'Tecan i-control') {
+      return(getReaderData(df))
+    } else { 
+      return(NULL)
     }
   })
   
@@ -99,7 +87,9 @@ shinyServer(function(input,output) {
   
   outputOptions(output,'fileUploaded',suspendWhenHidden=FALSE)
 
-  output$labelSelect <- renderUI({ selectInput(
+  output$labelSelect <- renderUI({ 
+    if(is.null(Data())) { return() }
+    selectInput(
     inputId = "label",
     label = "Select label to display",
     choices = names(Data()),
@@ -107,7 +97,7 @@ shinyServer(function(input,output) {
   })
   
   output$rowSelect <- renderUI({
-    if(is.null(input$datafile)) { return() }
+    if(is.null(Data())) { return() }
     plotData <- Data()[[input$label]]
     rows <- levels(factor(substring(colnames(plotData)[-1],1,1)))
     selectInput(
@@ -118,7 +108,7 @@ shinyServer(function(input,output) {
   })
   
   output$columnSelect <- renderUI({
-    if(is.null(input$datafile)) { return() }
+    if(is.null(Data())) { return() }
     plotData <- Data()[[input$label]]
     columns <- levels(factor(substring(colnames(plotData)[-1],2)))
     selectInput(
@@ -129,20 +119,25 @@ shinyServer(function(input,output) {
   })
   
   output$mainPlot <- renderPlot({   
-    if(is.null(input$datafile)) { return() }
+    if(is.null(Data())) { return() }
+    if(is.null(input$label)) { return() }
+    
     label <- input$label
     plotData <- Data()[[input$label]]
     cols <- c(colnames(plotData))
     
     if(input$wellsToAnalyse == "Well") {
+      if(is.null(input$well)) { return() }
       cols <- c("Time",input$well)
     }
     
     if(input$wellsToAnalyse == "Row") {
+      if(is.null(input$row)) { return() }
       cols <- c("Time",colnames(plotData)[grep(input$row,colnames(plotData))])
     }
     
     if(input$wellsToAnalyse == "Column") {
+      if(is.null(input$column)) { return() }
       cols <- c("Time",colnames(plotData)[grep(paste0("[A-Z]",input$column,"$"),colnames(plotData))])      
     }  
     plotData <- plotData[,cols]
