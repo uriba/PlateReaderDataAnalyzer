@@ -25,14 +25,54 @@ shinyUI(fluidPage(
         conditionalPanel(
           condition='input.wellsToAnalyse == "Column"',
           htmlOutput("columnSelect")
-        )
-        
-        #Data to display: raw, log(raw) (requires input of background according to possibilites), growth rate, doubling time.
-        #numericInput("background","Background value:",min = 0, max = 1, step = 0.001,value = 0)
+        ),
+        selectInput(
+          inputId = "analysisType",
+          label = "Data to display",
+          choices = c("Raw measurements","Growth rate analysis"),
+          selected = 1
+          ),
+        conditionalPanel(
+          condition='input.analysisType == "Growth rate analysis"',
+          selectInput(
+            inputId = "backgroundMethod",
+            label = "Background subtraction method",
+            choices = c("Average of first measurements of well",
+                        "Time average of blank wells",
+                        "Point-wise average of blank wells",
+                        "Manual value"),
+            selected = 1
+            ),
+          conditionalPanel(
+            condition='input.backgroundMethod == "Manual value"',
+            textInput("manualBackground","Background value to use",value="0.0")            
+            ),
+          conditionalPanel(
+            condition='input.backgroundMethod == "Time average of blank wells"',
+            textInput("averageBlanks","Blank wells to use",value="A1")            
+          ),
+          conditionalPanel(
+            condition='input.backgroundMethod == "Point-wise average of blank wells"',
+            textInput("pointWiseBlanks","Blank wells to use",value="A1")            
+          ),
+          conditionalPanel(
+            condition='input.backgroundMethod == "Average of first measurements of well"',
+            textInput("perWellMesNum","Number of measurements to use",value="1")            
+            )
+          )
         )
       ),
     mainPanel(
-      plotOutput("mainPlot")
+      conditionalPanel(
+        condition='input.analysisType == "Raw measurements"',
+        plotOutput("rawPlot")
+        ),
+      conditionalPanel(
+        condition='input.analysisType == "Growth rate analysis"',
+        plotOutput("logPlot"),
+        plotOutput("growthPlot"),
+        plotOutput("doublingPlot")
+        )
       )
     )
   ))

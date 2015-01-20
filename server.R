@@ -81,6 +81,30 @@ shinyServer(function(input,output) {
     }
   })
   
+  wells <- reactive({
+    if(is.null(Data())) { return() }
+    if(is.null(input$label)) { return() }
+    
+    plotData <- Data()[[input$label]]
+    cols <- c(colnames(plotData))
+    cols <- cols[cols != "Time"]
+    
+    if(input$wellsToAnalyse == "Well") {
+      if(is.null(input$well)) { return() }
+      cols <- strsplit(input$well,',')
+      cols <- cols[[1]]
+    }
+    if(input$wellsToAnalyse == "Row") {
+      if(is.null(input$row)) { return() }
+      cols <- cols[grep(input$row,cols)]
+    }
+    if(input$wellsToAnalyse == "Column") {
+      if(is.null(input$column)) { return() }
+      cols <- cols[grep(paste0("[A-Z]",input$column,"$"),cols)]      
+    }
+    return(cols)
+  })
+  
   output$fileUploaded <- reactive ({
     return (! is.null(Data()))
   })
@@ -118,31 +142,58 @@ shinyServer(function(input,output) {
       selected = 1)
   })
   
-  output$mainPlot <- renderPlot({   
-    if(is.null(Data())) { return() }
-    if(is.null(input$label)) { return() }
+  output$rawPlot <- renderPlot({   
+    if(is.null(wells())) { return() }
+    plotData <- Data()[[input$label]]    
+    plotData <- plotData[,c("Time",wells())]
     
-    label <- input$label
-    plotData <- Data()[[input$label]]
-    cols <- c(colnames(plotData))
-    
-    if(input$wellsToAnalyse == "Well") {
-      if(is.null(input$well)) { return() }
-      cols <- c("Time",input$well)
-    }
-    
-    if(input$wellsToAnalyse == "Row") {
-      if(is.null(input$row)) { return() }
-      cols <- c("Time",colnames(plotData)[grep(input$row,colnames(plotData))])
-    }
-    
-    if(input$wellsToAnalyse == "Column") {
-      if(is.null(input$column)) { return() }
-      cols <- c("Time",colnames(plotData)[grep(paste0("[A-Z]",input$column,"$"),colnames(plotData))])      
-    }  
-    plotData <- plotData[,cols]
-  
     ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
+    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
+  })
+  
+  output$logPlot <- renderPlot({
+    if(is.null(wells())) { return() }
+    plotData <- Data()[[input$label]]
+    cols <- wells()
+    wellsData <- as.data.frame(plotData[,cols])
+    if(input$backgroundMethod == "Manual value") {
+      wellsData[] <- lapply(wellsData[],function(x) {return (x - as.numeric(input$manualBackground))})
+    }
+    if(input$backgroundMethod == "Average of first measurements of well") {
+      backgrounds <- lapply(wellsData[],function(x) {return (mean(head(x,as.numeric(input$perWellMesNum))))})
+      for(col in cols) {
+        wellsData[,col] <- wellsData[,col]-as.numeric(backgrounds[col])
+      }
+    }
+    if(input$backgroundMethod == "Time average of blank wells") {
+      blankWells <- strsplit(input$averageBlanks,',')[[1]]
+      if(length(blankWells)>1) {
+        blankVals <- mean(colMeans(wellsData[,blankWells]))
+      }
+      if(length(blankWells) == 1) {
+        blankVals <- mean(wellsData[,blankWells])        
+      }
+      for(col in cols) {
+        wellsData[,col] <- wellsData[,col]-blankVals
+      }      
+    }
+    if(input$backgroundMethod == "Point-wise average of blank wells") {
+      blankWells <- strsplit(input$pointWiseBlanks,',')[[1]]
+      if(length(blankWells)>1) {
+        blankVals <- rowMeans(wellsData[,blankWells])
+      }
+      if(length(blankWells) == 1) {
+        blankVals <- wellsData[,blankWells]        
+      }
+      for(col in cols) {
+        wellsData[,col] <- wellsData[,col]-blankVals
+      }      
+    }
+    wellsData[] <- lapply(wellsData[],log)
+    
+    wellsData[,"Time"] <- plotData$Time
+
+    ggplotdata <- melt(wellsData,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
   })
 })
