@@ -12,11 +12,11 @@ shinyUI(fluidPage(
         selectInput(
           inputId = "wellsToAnalyse",
           label = "Wells to analyse",
-          choices = c("Whole plate","Row","Column","Well"),
+          choices = c("Whole plate","Row","Column","Wells"),
           selected = 1),
         conditionalPanel(
-          condition='input.wellsToAnalyse == "Well"',
-          textInput("well","Well to analyse",value="A1")
+          condition='input.wellsToAnalyse == "Wells"',
+          textInput("wells","Wells to analyse",value="A1")
         ),
         conditionalPanel(
           condition='input.wellsToAnalyse == "Row"',

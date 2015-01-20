@@ -89,9 +89,9 @@ shinyServer(function(input,output) {
     cols <- c(colnames(plotData))
     cols <- cols[cols != "Time"]
     
-    if(input$wellsToAnalyse == "Well") {
-      if(is.null(input$well)) { return() }
-      cols <- strsplit(input$well,',')
+    if(input$wellsToAnalyse == "Wells") {
+      if(is.null(input$wells)) { return() }
+      cols <- strsplit(input$wells,',')
       cols <- cols[[1]]
     }
     if(input$wellsToAnalyse == "Row") {
