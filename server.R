@@ -105,6 +105,36 @@ shinyServer(function(input,output) {
     return(cols)
   })
   
+  backgroundVals <- reactive({
+    if(is.null(Data())) { return() }
+    if(is.null(input$label)) { return() }
+    
+    wellsData <- Data()[[input$label]]
+    if(input$backgroundMethod == "Manual value") {
+      blankVals <- as.numeric(input$manualBackground)
+    }
+    if(input$backgroundMethod == "Average of first measurements of well") {
+      blankVals <- lapply(wellsData[],function(x) {return (mean(head(x,as.numeric(input$perWellMesNum))))})
+    }
+    if(input$backgroundMethod == "Time average of blank wells") {
+      blankWells <- strsplit(input$averageBlanks,',')[[1]]
+      if(length(blankWells)>1) {
+        blankVals <- mean(colMeans(wellsData[,blankWells]))
+      } else {
+        blankVals <- mean(wellsData[,blankWells])        
+      }
+    }
+    if(input$backgroundMethod == "Point-wise average of blank wells") {
+      blankWells <- strsplit(input$pointWiseBlanks,',')[[1]]
+      if(length(blankWells)>1) {
+        blankVals <- rowMeans(wellsData[,blankWells])
+      } else {
+        blankVals <- wellsData[,blankWells]        
+      }
+    }
+    return(blankVals)
+  })
+  
   output$fileUploaded <- reactive ({
     return (! is.null(Data()))
   })
@@ -156,39 +186,17 @@ shinyServer(function(input,output) {
     plotData <- Data()[[input$label]]
     cols <- wells()
     wellsData <- as.data.frame(plotData[,cols])
-    if(input$backgroundMethod == "Manual value") {
-      wellsData[] <- lapply(wellsData[],function(x) {return (x - as.numeric(input$manualBackground))})
-    }
-    if(input$backgroundMethod == "Average of first measurements of well") {
-      backgrounds <- lapply(wellsData[],function(x) {return (mean(head(x,as.numeric(input$perWellMesNum))))})
-      for(col in cols) {
-        wellsData[,col] <- wellsData[,col]-as.numeric(backgrounds[col])
-      }
-    }
-    if(input$backgroundMethod == "Time average of blank wells") {
-      blankWells <- strsplit(input$averageBlanks,',')[[1]]
-      if(length(blankWells)>1) {
-        blankVals <- mean(colMeans(wellsData[,blankWells]))
-      }
-      if(length(blankWells) == 1) {
-        blankVals <- mean(wellsData[,blankWells])        
-      }
-      for(col in cols) {
+    blankVals <- backgroundVals()
+    for(col in cols) {
+      print(blankVals)
+      print(typeof(blankVals))
+      if(!is.null(names(blankVals))) {
+        print(blankVals[col])
+        wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
+      } else {
         wellsData[,col] <- wellsData[,col]-blankVals
-      }      
-    }
-    if(input$backgroundMethod == "Point-wise average of blank wells") {
-      blankWells <- strsplit(input$pointWiseBlanks,',')[[1]]
-      if(length(blankWells)>1) {
-        blankVals <- rowMeans(wellsData[,blankWells])
       }
-      if(length(blankWells) == 1) {
-        blankVals <- wellsData[,blankWells]        
-      }
-      for(col in cols) {
-        wellsData[,col] <- wellsData[,col]-blankVals
-      }      
-    }
+    }      
     wellsData[] <- lapply(wellsData[],log)
     
     wellsData[,"Time"] <- plotData$Time
