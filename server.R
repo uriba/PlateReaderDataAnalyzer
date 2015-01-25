@@ -2,6 +2,7 @@ library(shiny)
 library(gdata)
 library(ggplot2)
 library(reshape2)
+library(zoo)
 
 labelSubset <- function(df,label) {
   readings <- as.numeric(rownames(df[df[,1] == "Cycle Nr.",]))
@@ -188,10 +189,7 @@ shinyServer(function(input,output) {
     wellsData <- as.data.frame(plotData[,cols])
     blankVals <- backgroundVals()
     for(col in cols) {
-      print(blankVals)
-      print(typeof(blankVals))
       if(!is.null(names(blankVals))) {
-        print(blankVals[col])
         wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
       } else {
         wellsData[,col] <- wellsData[,col]-blankVals
@@ -202,6 +200,59 @@ shinyServer(function(input,output) {
     wellsData[,"Time"] <- plotData$Time
 
     ggplotdata <- melt(wellsData,id="Time") # Reformat the data to be appropriate for multi line plot
+    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
+  })
+
+  output$growthRatePlot <- renderPlot({
+    if(is.null(wells())) { return() }
+    plotData <- Data()[[input$label]]
+    cols <- wells()
+    wellsData <- as.data.frame(plotData[,cols])
+    blankVals <- backgroundVals()
+    for(col in cols) {
+      if(!is.null(names(blankVals))) {
+        wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
+      } else {
+        wellsData[,col] <- wellsData[,col]-blankVals
+      }
+    }
+    reg <- function(window) {
+      cols <- colnames(window)
+      cols <- cols[cols!="Time"]
+      window <- as.data.frame(window)
+      window[,"ones"] <- 1
+      res <- list()
+      for(col in cols) {
+        data <- window[,col]
+        data[which(!is.finite(data))] = NA
+        times <- window[,"Time"]
+        times <- times[!is.na(data)]
+        data <- data[!is.na(data)]
+        if(length(data)>1) {
+          c <- lm(data ~ times)
+          rsq = summary(c)$r.squared
+          if(is.na(rsq) || rsq < 0.8) {
+            res[col] <- NA
+          } else {
+            res[col] <- (summary(c)$coefficients)["times","Estimate"]
+          }
+        } else {
+          res[col] <- NA
+        }
+      }
+      return(res)
+    }
+    wellsData[] <- lapply(wellsData[],log)
+    windowSize <- as.numeric(input$windowSize)
+    wellsData[,"Time"] <- plotData$Time
+    regs <- rollapply(wellsData,width=windowSize,reg,by.column=FALSE)
+    regs <- as.data.frame(regs,stringsAsFactors = FALSE)
+    regs[,"Time"] <- as.numeric(head(plotData$Time,length(regs[,1])))
+    for(col in colnames(regs)) {
+      regs[,col] <- as.numeric(regs[,col])
+    }
+
+    ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
   })
 })

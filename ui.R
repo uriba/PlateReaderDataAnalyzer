@@ -50,15 +50,16 @@ shinyUI(fluidPage(
           conditionalPanel(
             condition='input.backgroundMethod == "Time average of blank wells"',
             textInput("averageBlanks","Blank wells to use",value="A1")            
-          ),
+            ),
           conditionalPanel(
             condition='input.backgroundMethod == "Point-wise average of blank wells"',
             textInput("pointWiseBlanks","Blank wells to use",value="A1")            
-          ),
+            ),
           conditionalPanel(
             condition='input.backgroundMethod == "Average of first measurements of well"',
             textInput("perWellMesNum","Number of measurements to use",value="1")            
-            )
+            ),
+          textInput("windowSize","Growth rate window size",value="5")                      
           )
         )
       ),
@@ -70,7 +71,7 @@ shinyUI(fluidPage(
       conditionalPanel(
         condition='input.analysisType == "Growth rate analysis"',
         plotOutput("logPlot"),
-        plotOutput("growthPlot"),
+        plotOutput("growthRatePlot"),
         plotOutput("doublingPlot")
         )
       )
