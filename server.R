@@ -37,6 +37,7 @@ getPlateByLabel <- function(df,label) {
   colnames(plotData)[1] <- "Time" #Rename the time column so that it has a "nicer" name
   plotData[] <- lapply(plotData,as.character) # Convert values to numeric
   plotData[] <- lapply(plotData,as.numeric)
+  plotData[,"Time"] = plotData[,"Time"]/3600 # convert time to hours
   return(plotData)
 }
 
@@ -231,7 +232,7 @@ shinyServer(function(input,output) {
         if(length(data)>1) {
           c <- lm(data ~ times)
           rsq = summary(c)$r.squared
-          if(is.na(rsq) || rsq < 0.8) {
+          if(is.na(rsq) || rsq < as.numeric(input$rsquare)) {
             res[col] <- NA
           } else {
             res[col] <- (summary(c)$coefficients)["times","Estimate"]
@@ -253,6 +254,6 @@ shinyServer(function(input,output) {
     }
 
     ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
-    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
+    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()+scale_y_continuous(limits=c(-0.1,NA))
   })
 })

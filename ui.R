@@ -59,7 +59,8 @@ shinyUI(fluidPage(
             condition='input.backgroundMethod == "Average of first measurements of well"',
             textInput("perWellMesNum","Number of measurements to use",value="1")            
             ),
-          textInput("windowSize","Growth rate window size",value="5")                      
+          textInput("windowSize","Growth rate window size",value="5"),
+          textInput("rsquare","R-square threshold",value="0.9")
           )
         )
       ),
