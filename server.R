@@ -180,7 +180,9 @@ shinyServer(function(input,output) {
     plotData <- plotData[,c("Time",wells())]
     
     ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
+    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()+
+      xlab("Time [h]")+
+      ylab(input$label)
   })
   
   output$logPlot <- renderPlot({
@@ -201,7 +203,10 @@ shinyServer(function(input,output) {
     wellsData[,"Time"] <- plotData$Time
 
     ggplotdata <- melt(wellsData,id="Time") # Reformat the data to be appropriate for multi line plot
-    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()
+    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+
+      geom_line()+
+      xlab("Time [h]")+
+      ylab(paste0("Log ",input$label))
   })
 
   output$growthRatePlot <- renderPlot({
@@ -254,6 +259,10 @@ shinyServer(function(input,output) {
     }
 
     ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
-    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()+scale_y_continuous(limits=c(-0.1,NA))
+    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+
+      geom_line()+
+      scale_y_continuous(limits=c(-0.1,NA))+
+      xlab("Time [h]")+
+      ylab("Growth rate")
   })
 })
