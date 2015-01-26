@@ -137,6 +137,24 @@ shinyServer(function(input,output) {
     return(blankVals)
   })
   
+  backgroundSubtractedLog <- reactive({
+    plotData <- Data()[[input$label]]
+    cols <- wells()
+    wellsData <- as.data.frame(plotData[,cols])
+    blankVals <- backgroundVals()
+    for(col in cols) {
+      if(!is.null(names(blankVals))) {
+        wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
+      } else {
+        wellsData[,col] <- wellsData[,col]-blankVals
+      }
+    }      
+    wellsData[] <- lapply(wellsData[],log)
+    
+    wellsData[,"Time"] <- plotData$Time
+    return(wellsData)
+  })
+  
   output$fileUploaded <- reactive ({
     return (! is.null(Data()))
   })
@@ -181,47 +199,26 @@ shinyServer(function(input,output) {
     
     ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+geom_line()+
-      xlab("Time [h]")+
+      guides(colour=guide_legend(title="Well",nrow=20))+
+      xlab("time [h]")+
       ylab(input$label)
   })
   
   output$logPlot <- renderPlot({
     if(is.null(wells())) { return() }
-    plotData <- Data()[[input$label]]
-    cols <- wells()
-    wellsData <- as.data.frame(plotData[,cols])
-    blankVals <- backgroundVals()
-    for(col in cols) {
-      if(!is.null(names(blankVals))) {
-        wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
-      } else {
-        wellsData[,col] <- wellsData[,col]-blankVals
-      }
-    }      
-    wellsData[] <- lapply(wellsData[],log)
-    
-    wellsData[,"Time"] <- plotData$Time
 
+    wellsData <- backgroundSubtractedLog()
     ggplotdata <- melt(wellsData,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+
       geom_line()+
-      xlab("Time [h]")+
-      ylab(paste0("Log ",input$label))
+      guides(colour=guide_legend(title="Well",nrow=20))+
+      xlab("time [h]")+
+      ylab(paste0("log ",input$label))
   })
 
   output$growthRatePlot <- renderPlot({
     if(is.null(wells())) { return() }
-    plotData <- Data()[[input$label]]
-    cols <- wells()
-    wellsData <- as.data.frame(plotData[,cols])
-    blankVals <- backgroundVals()
-    for(col in cols) {
-      if(!is.null(names(blankVals))) {
-        wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
-      } else {
-        wellsData[,col] <- wellsData[,col]-blankVals
-      }
-    }
+    
     reg <- function(window) {
       cols <- colnames(window)
       cols <- cols[cols!="Time"]
@@ -248,12 +245,13 @@ shinyServer(function(input,output) {
       }
       return(res)
     }
-    wellsData[] <- lapply(wellsData[],log)
+    
+    wellsData <- backgroundSubtractedLog()
     windowSize <- as.numeric(input$windowSize)
-    wellsData[,"Time"] <- plotData$Time
+
     regs <- rollapply(wellsData,width=windowSize,reg,by.column=FALSE)
     regs <- as.data.frame(regs,stringsAsFactors = FALSE)
-    regs[,"Time"] <- as.numeric(head(plotData$Time,length(regs[,1])))
+    regs[,"Time"] <- as.numeric(head(wellsData$Time,length(regs[,1])))
     for(col in colnames(regs)) {
       regs[,col] <- as.numeric(regs[,col])
     }
@@ -261,8 +259,9 @@ shinyServer(function(input,output) {
     ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+
       geom_line()+
+      guides(colour=guide_legend(title="Well",nrow=20))+
       scale_y_continuous(limits=c(-0.1,NA))+
-      xlab("Time [h]")+
-      ylab("Growth rate")
+      xlab("time [h]")+
+      ylab("growth rate")
   })
 })
