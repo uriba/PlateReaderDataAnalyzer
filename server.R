@@ -155,6 +155,46 @@ shinyServer(function(input,output) {
     return(wellsData)
   })
   
+  rollingWindowRegression <- reactive({
+    reg <- function(window) {
+      cols <- colnames(window)
+      cols <- cols[cols!="Time"]
+      window <- as.data.frame(window)
+      window[,"ones"] <- 1
+      res <- list()
+      for(col in cols) {
+        data <- window[,col]
+        data[which(!is.finite(data))] = NA
+        times <- window[,"Time"]
+        times <- times[!is.na(data)]
+        data <- data[!is.na(data)]
+        if(length(data)>1) {
+          c <- lm(data ~ times)
+          rsq = summary(c)$r.squared
+          if(is.na(rsq) || rsq < as.numeric(input$rsquare)) {
+            res[col] <- NA
+          } else {
+            res[col] <- (summary(c)$coefficients)["times","Estimate"]
+          }
+        } else {
+          res[col] <- NA
+        }
+      }
+      return(res)
+    }
+    
+    wellsData <- backgroundSubtractedLog()
+    windowSize <- as.numeric(input$windowSize)
+    
+    regs <- rollapply(wellsData,width=windowSize,reg,by.column=FALSE)
+    regs <- as.data.frame(regs,stringsAsFactors = FALSE)
+    regs[,"Time"] <- as.numeric(head(wellsData$Time,length(regs[,1])))
+    for(col in colnames(regs)) {
+      regs[,col] <- as.numeric(regs[,col])
+    }
+    return(regs)
+  })
+  
   output$fileUploaded <- reactive ({
     return (! is.null(Data()))
   })
@@ -218,44 +258,7 @@ shinyServer(function(input,output) {
 
   output$growthRatePlot <- renderPlot({
     if(is.null(wells())) { return() }
-    
-    reg <- function(window) {
-      cols <- colnames(window)
-      cols <- cols[cols!="Time"]
-      window <- as.data.frame(window)
-      window[,"ones"] <- 1
-      res <- list()
-      for(col in cols) {
-        data <- window[,col]
-        data[which(!is.finite(data))] = NA
-        times <- window[,"Time"]
-        times <- times[!is.na(data)]
-        data <- data[!is.na(data)]
-        if(length(data)>1) {
-          c <- lm(data ~ times)
-          rsq = summary(c)$r.squared
-          if(is.na(rsq) || rsq < as.numeric(input$rsquare)) {
-            res[col] <- NA
-          } else {
-            res[col] <- (summary(c)$coefficients)["times","Estimate"]
-          }
-        } else {
-          res[col] <- NA
-        }
-      }
-      return(res)
-    }
-    
-    wellsData <- backgroundSubtractedLog()
-    windowSize <- as.numeric(input$windowSize)
-
-    regs <- rollapply(wellsData,width=windowSize,reg,by.column=FALSE)
-    regs <- as.data.frame(regs,stringsAsFactors = FALSE)
-    regs[,"Time"] <- as.numeric(head(wellsData$Time,length(regs[,1])))
-    for(col in colnames(regs)) {
-      regs[,col] <- as.numeric(regs[,col])
-    }
-
+    regs <- rollingWindowRegression()    
     ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+
       geom_line()+
