@@ -155,6 +155,13 @@ shinyServer(function(input,output) {
     return(wellsData)
   })
   
+  timeLimits <- reactive({
+    plotData <- Data()[[input$label]]
+    timesRange <- range(plotData$Time)
+    delta <- timesRange[2]-timesRange[1]
+    return(c(timesRange[1]-0.05*delta,timesRange[2]+0.05*delta))
+  })
+  
   rollingWindowRegression <- reactive({
     reg <- function(window) {
       cols <- colnames(window)
@@ -252,6 +259,7 @@ shinyServer(function(input,output) {
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+
       geom_line()+
       guides(colour=guide_legend(title="Well",nrow=20))+
+      scale_x_continuous(limits=timeLimits())+
       xlab("time [h]")+
       ylab(paste0("log ",input$label))
   })
@@ -264,7 +272,24 @@ shinyServer(function(input,output) {
       geom_line()+
       guides(colour=guide_legend(title="Well",nrow=20))+
       scale_y_continuous(limits=c(-0.1,NA))+
+      scale_x_continuous(limits=timeLimits())+
       xlab("time [h]")+
       ylab("growth rate")
   })
+  output$doublingTimePlot <- renderPlot({
+    if(is.null(wells())) { return() }
+    regs <- rollingWindowRegression()
+
+    regs[,colnames(regs)!="Time"] <- lapply(regs[,colnames(regs)!="Time"],function(x) {log(2)*60/x})
+    
+    ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
+    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+
+      geom_line()+
+      guides(colour=guide_legend(title="Well",nrow=20))+
+      scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
+      scale_x_continuous(limits=timeLimits())+
+      xlab("time [h]")+
+      ylab("doubling time [min]")
+  })
+  
 })
