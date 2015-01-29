@@ -1,3 +1,13 @@
+#ToDo:
+#Use plot.ly
+#Add error bars to growth rate and doubling time plots
+#Make plots with dots and maybe lines
+#Update account to milolab
+#Add help and documentation to web page
+#Add plots of growth rate/doubling time as function of log-OD
+#Add plots for expression levels
+#Consider toggling what graphs to display
+
 library(shiny)
 library(gdata)
 library(ggplot2)
@@ -110,8 +120,8 @@ shinyServer(function(input,output) {
   backgroundVals <- reactive({
     if(is.null(Data())) { return() }
     if(is.null(input$label)) { return() }
-    
     wellsData <- Data()[[input$label]]
+    
     if(input$backgroundMethod == "Manual value") {
       blankVals <- as.numeric(input$manualBackground)
     }
@@ -142,7 +152,6 @@ shinyServer(function(input,output) {
       }
     }      
     wellsData[] <- lapply(wellsData[],log)
-    
     wellsData[,"Time"] <- plotData$Time
     return(wellsData)
   })
@@ -174,6 +183,7 @@ shinyServer(function(input,output) {
             res[col] <- NA
           } else {
             res[col] <- (summary(c)$coefficients)["times","Estimate"]
+            #add error bars
           }
         } else {
           res[col] <- NA
@@ -204,7 +214,7 @@ shinyServer(function(input,output) {
     if(is.null(Data())) { return() }
     selectInput(
     inputId = "label",
-    label = "Select label to display",
+    label = "Measurement label to display",
     choices = names(Data()),
     selected = 1)
   })
@@ -245,8 +255,8 @@ shinyServer(function(input,output) {
   
   output$logPlot <- renderPlot({
     if(is.null(wells())) { return() }
-
     wellsData <- backgroundSubtractedLog()
+    
     ggplotdata <- melt(wellsData,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+
       geom_line()+
@@ -259,6 +269,7 @@ shinyServer(function(input,output) {
   output$growthRatePlot <- renderPlot({
     if(is.null(wells())) { return() }
     regs <- rollingWindowRegression()    
+    
     ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
     ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable))+
       geom_line()+
@@ -271,7 +282,6 @@ shinyServer(function(input,output) {
   output$doublingTimePlot <- renderPlot({
     if(is.null(wells())) { return() }
     regs <- rollingWindowRegression()
-
     regs[,colnames(regs)!="Time"] <- lapply(regs[,colnames(regs)!="Time"],function(x) {log(2)*60/x})
     
     ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
@@ -283,5 +293,4 @@ shinyServer(function(input,output) {
       xlab("time [h]")+
       ylab("doubling time [min]")
   })
-  
 })

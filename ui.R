@@ -1,6 +1,6 @@
 library(shiny)
 shinyUI(fluidPage(
-  titlePanel("Plate Reader data analysis"),
+  titlePanel("Plate Reader Data Analysis"),
   sidebarLayout(
     sidebarPanel(
       fileInput("datafile","Excel reader data file:"),
