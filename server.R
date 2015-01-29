@@ -120,19 +120,11 @@ shinyServer(function(input,output) {
     }
     if(input$backgroundMethod == "Time average of blank wells") {
       blankWells <- strsplit(input$averageBlanks,',')[[1]]
-      if(length(blankWells)>1) {
-        blankVals <- mean(colMeans(wellsData[,blankWells]))
-      } else {
-        blankVals <- mean(wellsData[,blankWells])        
-      }
+      blankVals <- mean(colMeans(wellsData[,blankWells,drop=FALSE]))
     }
     if(input$backgroundMethod == "Point-wise average of blank wells") {
       blankWells <- strsplit(input$pointWiseBlanks,',')[[1]]
-      if(length(blankWells)>1) {
-        blankVals <- rowMeans(wellsData[,blankWells])
-      } else {
-        blankVals <- wellsData[,blankWells]        
-      }
+      blankVals <- rowMeans(wellsData[,blankWells,drop=FALSE])
     }
     return(blankVals)
   })
@@ -143,7 +135,7 @@ shinyServer(function(input,output) {
     wellsData <- as.data.frame(plotData[,cols])
     blankVals <- backgroundVals()
     for(col in cols) {
-      if(!is.null(names(blankVals))) {
+      if(col %in% names(blankVals)) {
         wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
       } else {
         wellsData[,col] <- wellsData[,col]-blankVals
