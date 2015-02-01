@@ -1,4 +1,5 @@
 library(shiny)
+
 shinyUI(fluidPage(
   titlePanel("Plate Reader Data Analysis"),
   sidebarLayout(
@@ -29,7 +30,7 @@ shinyUI(fluidPage(
         selectInput(
           inputId = "analysisType",
           label = "Data to display",
-          choices = c("Raw measurements","Growth rate analysis"),
+          choices = c("Raw measurements","Growth rate analysis","Plotly test"),
           selected = 1
           ),
         conditionalPanel(
@@ -75,7 +76,12 @@ shinyUI(fluidPage(
         plotOutput("logPlot"),
         plotOutput("growthRatePlot"),
         plotOutput("doublingTimePlot")
-        )
+        ),
+      conditionalPanel(
+        condition='input.analysisType == "Plotly test"',
+        htmlOutput("plot")
       )
+    )
+    
     )
   ))
