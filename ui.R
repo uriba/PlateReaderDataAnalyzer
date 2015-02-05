@@ -61,6 +61,7 @@ shinyUI(fluidPage(
             textInput("perWellMesNum","Number of measurements to use",value="1")            
             ),
           textInput("windowSize","Growth rate window size",value="5"),
+          checkboxInput("errorBars","Show error bars"),
           textInput("maxdtime","Maximum doubling time in minutes",value="300"),
           textInput("rsquare","R-square threshold",value="0.9")
           )

@@ -1,8 +1,8 @@
 #ToDo:
-#Integrate plot.ly as choice for output.
+#Integrate plot.ly as choice for output for export (given username and authentication key).
+#find way to use multiple columns in plot.ly legend.
 #Color code input types + collapsable for cleaner UI.
 #Add error bars to growth rate and doubling time plots
-#Make plots with dots and maybe lines
 #Add help and documentation to web page
 #Add plots of growth rate/doubling time as function of log-OD
 #Add plots for expression levels
@@ -184,7 +184,7 @@ shinyServer(function(input,output) {
             res[col] <- NA
           } else {
             res[col] <- (summary(c)$coefficients)["times","Estimate"]
-            #add error bars
+            res[paste0(col,'.std_err')]<-summary(c)$coefficients["times","Std. Error"]
           }
         } else {
           res[col] <- NA
@@ -201,8 +201,16 @@ shinyServer(function(input,output) {
     regs[,"Time"] <- as.numeric(head(wellsData$Time,length(regs[,1])))
     for(col in colnames(regs)) {
       regs[,col] <- as.numeric(regs[,col])
+    }    
+    
+    std_errs = grep("std_err$",colnames(regs),value=TRUE)
+    
+    regs.long <- melt(regs,id.vars=c(std_errs,"Time"))# Reformat the data to be appropriate for multi line plot
+    regs.long[,'se']=1
+    for (col in wells()) {
+      regs.long[which(regs.long$variable==col),'se']=regs.long[which(regs.long$variable==col),paste0(col,".std_err")]
     }
-    return(regs)
+    return(regs.long)
   })
   
   output$fileUploaded <- reactive ({
@@ -289,30 +297,40 @@ shinyServer(function(input,output) {
 
   output$growthRatePlot <- renderPlot({
     if(is.null(wells())) { return() }
-    regs <- rollingWindowRegression()    
-    
-    ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
-    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+
-      geom_point()+geom_line()+
+    ggplotdata <- rollingWindowRegression()    
+
+    pd = position_dodge(0.1)
+    p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))
+    if(input$errorBars) {
+      p <- p+geom_errorbar(aes(ymax=value+se,ymin=value-se),width=.1,position=pd)
+    }
+    p <- p+geom_point(position=pd)+geom_line(position=pd)+
       guides(colour=guide_legend(title="Well",nrow=20))+
       scale_y_continuous(limits=c(-0.1,NA))+
       scale_x_continuous(limits=timeLimits())+
       xlab("time [h]")+
       ylab("growth rate")
+    return(p)
   })
   
   output$doublingTimePlot <- renderPlot({
     if(is.null(wells())) { return() }
-    regs <- rollingWindowRegression()
-    regs[,colnames(regs)!="Time"] <- lapply(regs[,colnames(regs)!="Time"],function(x) {log(2)*60/x})
-    
-    ggplotdata <- melt(regs,id="Time") # Reformat the data to be appropriate for multi line plot
-    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+
-      geom_point()+geom_line()+
+    ggplotdata <- rollingWindowRegression()
+    ggplotdata[,'ymax'] <- ggplotdata$value+ggplotdata$se
+    ggplotdata[,'ymin'] <- ggplotdata$value-ggplotdata$se
+    ggplotdata[,c('value','ymax','ymin')] <- lapply(ggplotdata[,c('value','ymax','ymin')],function(x) {log(2)*60/x})
+
+    pd = position_dodge(0.1)
+    p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))
+    if(input$errorBars) {
+      p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
+    }    
+    p <- p+geom_point(position=pd)+geom_line(position=pd)+
       guides(colour=guide_legend(title="Well",nrow=20))+
       scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
       scale_x_continuous(limits=timeLimits())+
       xlab("time [h]")+
       ylab("doubling time [min]")
+    return(p)
   })
 })
