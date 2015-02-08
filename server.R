@@ -2,7 +2,6 @@
 #Integrate plot.ly as choice for output for export (given username and authentication key).
 #find way to use multiple columns in plot.ly legend.
 #Color code input types + collapsable for cleaner UI.
-#Add error bars to growth rate and doubling time plots
 #Add help and documentation to web page
 #Add plots of growth rate/doubling time as function of log-OD
 #Add plots for expression levels
@@ -143,8 +142,11 @@ shinyServer(function(input,output) {
   backgroundSubtractedLog <- reactive({
     plotData <- Data()[[input$label]]
     cols <- wells()
-    wellsData <- as.data.frame(plotData[,cols])
+    wellsData <- plotData[,cols,drop=FALSE]
     blankVals <- backgroundVals()
+    print(cols)
+    print(wellsData)
+    print(typeof(wellsData))
     for(col in cols) {
       if(col %in% names(blankVals)) {
         wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
