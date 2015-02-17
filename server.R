@@ -144,9 +144,6 @@ shinyServer(function(input,output) {
     cols <- wells()
     wellsData <- plotData[,cols,drop=FALSE]
     blankVals <- backgroundVals()
-    print(cols)
-    print(wellsData)
-    print(typeof(wellsData))
     for(col in cols) {
       if(col %in% names(blankVals)) {
         wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
@@ -186,11 +183,11 @@ shinyServer(function(input,output) {
             res[col] <- NA
           } else {
             res[col] <- (summary(c)$coefficients)["times","Estimate"]
-            res[paste0(col,'.std_err')]<-summary(c)$coefficients["times","Std. Error"]
           }
+        res[paste0(col,'.std_err')]<-summary(c)$coefficients["times","Std. Error"]  
         } else {
           res[col] <- NA
-        }
+          res[paste0(col,'.std_err')]<- NA        }
       }
       return(res)
     }
@@ -209,6 +206,7 @@ shinyServer(function(input,output) {
     
     regs.long <- melt(regs,id.vars=c(std_errs,"Time"))# Reformat the data to be appropriate for multi line plot
     regs.long[,'se']=1
+    
     for (col in wells()) {
       regs.long[which(regs.long$variable==col),'se']=regs.long[which(regs.long$variable==col),paste0(col,".std_err")]
     }
@@ -300,7 +298,6 @@ shinyServer(function(input,output) {
   output$growthRatePlot <- renderPlot({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()    
-
     pd = position_dodge(0.1)
     p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))
     if(input$errorBars) {
