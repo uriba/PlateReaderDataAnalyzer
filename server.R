@@ -7,7 +7,7 @@
 #Add plots for expression levels
 #Consider toggling what graphs to display
 #Add interactive graphs via highcharts
-#Have first mode be "plate overview", then allow user to select growth rate analysis
+#Allow user to select growth rate analysis
 #with checkboxes on graphs to display (raw, bg subtracted, bg subtracted log, gr, doublingtime, with/without errorbars),
 #expression level analysis etc.
 
@@ -78,6 +78,7 @@ getReaderData <- function(df) {
   }
   return(measurements)  
 }
+max_labels <- 10
 
 shinyServer(function(input,output) {
   Data <- reactive({
@@ -99,9 +100,8 @@ shinyServer(function(input,output) {
   
   wells <- reactive({
     if(is.null(Data())) { return() }
-    if(is.null(input$label)) { return() }
     
-    plotData <- Data()[[input$label]]
+    plotData <- Data()[[names(Data())[1]]]
     cols <- c(colnames(plotData))
     cols <- cols[cols != "Time"]
     
@@ -234,7 +234,7 @@ shinyServer(function(input,output) {
   
   output$rowSelect <- renderUI({
     if(is.null(Data())) { return() }
-    plotData <- Data()[[input$label]]
+    plotData <- Data()[[names(Data())[1]]]
     rows <- levels(factor(substring(colnames(plotData)[-1],1,1)))
     selectInput(
     inputId = "row",
@@ -245,7 +245,7 @@ shinyServer(function(input,output) {
   
   output$columnSelect <- renderUI({
     if(is.null(Data())) { return() }
-    plotData <- Data()[[input$label]]
+    plotData <- Data()[[names(Data())[1]]]
     columns <- levels(factor(substring(colnames(plotData)[-1],2)))
     selectInput(
       inputId = "column",
@@ -253,6 +253,35 @@ shinyServer(function(input,output) {
       choices = columns,
       selected = 1)
   })
+  
+  output$plots <- renderUI({
+    if(is.null(Data())) { return() }
+    # for each label - create a plotOutput object with the appropriate name:
+    plots_list <- lapply(1:length(names(Data())),function(i){
+      plotname <- paste0("raw",i)
+      plotOutput(plotname)
+    })
+    do.call(tagList,plots_list)    
+  })
+  
+  for (i in 1:max_labels) { # generate plots for all the labels (up to 10 labels are allowed)
+    local({
+      my_i <- i
+      print(my_i)
+      output[[paste0("raw",my_i)]] <- renderPlot({
+        if(is.null(wells())) { return() }
+        label <- names(Data())[my_i]
+        plotData <- Data()[[label]]    
+        plotData <- plotData[,c("Time",wells())]
+      
+        ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
+        ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+geom_point()+geom_line()+
+          guides(colour=guide_legend(title="Well",nrow=20))+
+          xlab("time [h]")+
+          ylab(label)
+      })
+    })  
+  }
   
   output$plot <- renderUI({   
     if(is.null(wells())) { return() }
@@ -274,18 +303,6 @@ shinyServer(function(input,output) {
     tags$iframe(src=res$response$url,frameborder="0",height=400,width=650)
   })
 
-  output$rawPlot <- renderPlot({   
-    if(is.null(wells())) { return() }
-    plotData <- Data()[[input$label]]    
-    plotData <- plotData[,c("Time",wells())]
-    
-    ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+geom_point()+geom_line()+
-      guides(colour=guide_legend(title="Well",nrow=20))+
-      xlab("time [h]")+
-      ylab(input$label)
-  })
-  
   output$logPlot <- renderPlot({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()

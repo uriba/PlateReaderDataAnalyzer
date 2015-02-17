@@ -7,8 +7,6 @@ shinyUI(fluidPage(
       fileInput("datafile","Excel reader data file:"),
       conditionalPanel(
         condition="output.fileUploaded",
-        #make the following conditional on having a file.
-        htmlOutput("labelSelect"),
         #multiple choices of mode: whole plate, wells by row, wells by column, single well
         selectInput(
           inputId = "wellsToAnalyse",
@@ -30,11 +28,12 @@ shinyUI(fluidPage(
         selectInput(
           inputId = "analysisType",
           label = "Data to display",
-          choices = c("Raw measurements","Growth rate analysis","Plotly test"),
+          choices = c("Plate overview","Growth rate analysis","Plotly test"),
           selected = 1
           ),
         conditionalPanel(
           condition='input.analysisType == "Growth rate analysis"',
+          htmlOutput("labelSelect"),
           selectInput(
             inputId = "backgroundMethod",
             label = "Background subtraction method",
@@ -69,8 +68,8 @@ shinyUI(fluidPage(
       ),
     mainPanel(
       conditionalPanel(
-        condition='input.analysisType == "Raw measurements"',
-        plotOutput("rawPlot")
+        condition='input.analysisType == "Plate overview"', 
+        htmlOutput("plots")
         ),
       conditionalPanel(
         condition='input.analysisType == "Growth rate analysis"',
