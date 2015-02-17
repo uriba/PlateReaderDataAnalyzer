@@ -6,6 +6,10 @@
 #Add plots of growth rate/doubling time as function of log-OD
 #Add plots for expression levels
 #Consider toggling what graphs to display
+#Add interactive graphs via highcharts
+#Have first mode be "plate overview", then allow user to select growth rate analysis
+#with checkboxes on graphs to display (raw, bg subtracted, bg subtracted log, gr, doublingtime, with/without errorbars),
+#expression level analysis etc.
 
 library(shiny)
 library(gdata)
