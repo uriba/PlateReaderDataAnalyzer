@@ -129,15 +129,15 @@ shinyServer(function(input,output) {
     if(input$backgroundMethod == "Manual value") {
       blankVals <- as.numeric(input$manualBackground)
     }
-    if(input$backgroundMethod == "Average of first measurements of well") {
+    else if(input$backgroundMethod == "Average of first measurements of well") {
       blankVals <- lapply(wellsData[],function(x) {return (mean(head(x,as.numeric(input$perWellMesNum))))})
     }
-    if(input$backgroundMethod == "Time average of blank wells") {
-      blankWells <- strsplit(input$averageBlanks,',')[[1]]
+    else if(input$backgroundMethod == "Time average of blank wells") {
+      blankWells <- strsplit(input$blankWells,',')[[1]]
       blankVals <- mean(colMeans(wellsData[,blankWells,drop=FALSE]))
     }
-    if(input$backgroundMethod == "Point-wise average of blank wells") {
-      blankWells <- strsplit(input$pointWiseBlanks,',')[[1]]
+    else if(input$backgroundMethod == "Point-wise average of blank wells") {
+      blankWells <- strsplit(input$blankWells,',')[[1]]
       blankVals <- rowMeans(wellsData[,blankWells,drop=FALSE])
     }
     return(blankVals)

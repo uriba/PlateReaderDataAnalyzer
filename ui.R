@@ -7,7 +7,6 @@ shinyUI(fluidPage(
       fileInput("datafile","Excel reader data file:"),
       conditionalPanel(
         condition="output.fileUploaded",
-        #multiple choices of mode: whole plate, wells by row, wells by column, single well
         selectInput(
           inputId = "wellsToAnalyse",
           label = "Wells to analyse",
@@ -48,12 +47,8 @@ shinyUI(fluidPage(
             textInput("manualBackground","Background value to use",value="0.0")            
             ),
           conditionalPanel(
-            condition='input.backgroundMethod == "Time average of blank wells"',
-            textInput("averageBlanks","Blank wells to use",value="A1")            
-            ),
-          conditionalPanel(
-            condition='input.backgroundMethod == "Point-wise average of blank wells"',
-            textInput("pointWiseBlanks","Blank wells to use",value="A1")            
+            condition='input.backgroundMethod == "Time average of blank wells" || input.backgroundMethod == "Point-wise average of blank wells"',
+            textInput("blankWells","Blank wells to use",value="A1")            
             ),
           conditionalPanel(
             condition='input.backgroundMethod == "Average of first measurements of well"',
