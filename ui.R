@@ -54,6 +54,13 @@ shinyUI(fluidPage(
             condition='input.backgroundMethod == "Average of first measurements of well"',
             textInput("perWellMesNum","Number of measurements to use",value="1")            
             ),
+          checkboxGroupInput("grPlots","Plots to display",c("raw",
+                                                            "background subtracted",
+                                                            "background subtracted log",
+                                                            "growth rate vs. time",
+                                                            "doubling time vs. time",
+                                                            "growth rate vs. value",
+                                                            "doubling time vs. value")),
           textInput("windowSize","Growth rate window size",value="5"),
           checkboxInput("errorBars","Show error bars"),
           textInput("maxdtime","Maximum doubling time in minutes",value="300"),
@@ -63,20 +70,13 @@ shinyUI(fluidPage(
       ),
     mainPanel(
       conditionalPanel(
-        condition='input.analysisType == "Plate overview"', 
+        condition='(input.analysisType == "Plate overview") || (input.analysisType == "Growth rate analysis")', 
         htmlOutput("plots")
-        ),
-      conditionalPanel(
-        condition='input.analysisType == "Growth rate analysis"',
-        plotOutput("logPlot"),
-        plotOutput("growthRatePlot"),
-        plotOutput("doublingTimePlot")
         ),
       conditionalPanel(
         condition='input.analysisType == "Plotly test"',
         htmlOutput("plot")
-      )
-    )
-    
+        )
+      )    
     )
   ))

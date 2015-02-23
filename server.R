@@ -5,11 +5,7 @@
 #Add help and documentation to web page
 #Add plots of growth rate/doubling time as function of log-OD
 #Add plots for expression levels
-#Consider toggling what graphs to display
 #Add interactive graphs via highcharts
-#Allow user to select growth rate analysis
-#with checkboxes on graphs to display (raw, bg subtracted, bg subtracted log, gr, doublingtime, with/without errorbars),
-#expression level analysis etc.
 
 library(shiny)
 library(gdata)
@@ -78,7 +74,7 @@ getReaderData <- function(df) {
   }
   return(measurements)  
 }
-max_labels <- 10
+max_plots <- 10
 
 shinyServer(function(input,output) {
   Data <- reactive({
@@ -143,7 +139,7 @@ shinyServer(function(input,output) {
     return(blankVals)
   })
   
-  backgroundSubtractedLog <- reactive({
+  backgroundSubtracted <- reactive({
     plotData <- Data()[[input$label]]
     cols <- wells()
     wellsData <- plotData[,cols,drop=FALSE]
@@ -155,10 +151,16 @@ shinyServer(function(input,output) {
         wellsData[,col] <- wellsData[,col]-blankVals
       }
     }      
-    wellsData[] <- lapply(wellsData[],log)
     wellsData[,"Time"] <- plotData$Time
     return(wellsData)
   })
+  
+  backgroundSubtractedLog <- reactive({
+    bgSubtracted <- backgroundSubtracted()
+    print(wells())
+    bgSubtracted[,wells()] <- lapply(bgSubtracted[,wells()],log)
+    return(bgSubtracted)
+  })  
   
   timeLimits <- reactive({
     plotData <- Data()[[input$label]]
@@ -256,29 +258,40 @@ shinyServer(function(input,output) {
   
   output$plots <- renderUI({
     if(is.null(Data())) { return() }
+    if(input$analysisType == "Plate overview") {
+      plotsNum = length(names(Data()))
+    }
+    if(input$analysisType == "Growth rate analysis") {
+      plotsNum = length(input$grPlots)
+    }
     # for each label - create a plotOutput object with the appropriate name:
-    plots_list <- lapply(1:length(names(Data())),function(i){
-      plotname <- paste0("raw",i)
+    plots_list <- lapply(1:plotsNum,function(i){
+      plotname <- paste0("plot",i)
       plotOutput(plotname)
     })
     do.call(tagList,plots_list)    
   })
   
-  for (i in 1:max_labels) { # generate plots for all the labels (up to 10 labels are allowed)
+  for (i in 1:max_plots) { # generate plots for all the labels (up to 10 labels are allowed)
     local({
       my_i <- i
-      print(my_i)
-      output[[paste0("raw",my_i)]] <- renderPlot({
+      output[[paste0("plot",my_i)]] <- renderPlot({
         if(is.null(wells())) { return() }
-        label <- names(Data())[my_i]
-        plotData <- Data()[[label]]    
-        plotData <- plotData[,c("Time",wells())]
+        if(input$analysisType == "Plate overview") {
+          label <- names(Data())[my_i]
+          plotData <- Data()[[label]]    
+          plotData <- plotData[,c("Time",wells())]
       
-        ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-        ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+geom_point()+geom_line()+
-          guides(colour=guide_legend(title="Well",nrow=20))+
-          xlab("time [h]")+
-          ylab(label)
+          ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
+          ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+geom_point()+geom_line()+
+            guides(colour=guide_legend(title="Well",nrow=20))+
+            xlab("time [h]")+
+            ylab(label)
+        }
+        else if(input$analysisType =="Growth rate analysis") {
+          if(my_i>length(input$grPlots)) {return ()}
+          return(plots[[input$grPlots[my_i]]]())
+        }
       })
     })  
   }
@@ -302,8 +315,35 @@ shinyServer(function(input,output) {
     print(res)
     tags$iframe(src=res$response$url,frameborder="0",height=400,width=650)
   })
-
-  output$logPlot <- renderPlot({
+  
+  plots <- list()
+  plots[["raw"]] <- reactive({
+    if(is.null(wells())) { return() }
+      label <- input$label
+      plotData <- Data()[[label]]    
+      plotData <- plotData[,c("Time",wells())]
+      
+      ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
+      p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+geom_point()+geom_line()+
+        guides(colour=guide_legend(title="Well",nrow=20))+
+        xlab("time [h]")+
+        ylab(label)
+      return(p)
+  })
+  plots[["background subtracted"]] = reactive({
+    if(is.null(wells())) { return() }
+    wellsData <- backgroundSubtracted()
+    
+    ggplotdata <- melt(wellsData,id="Time") # Reformat the data to be appropriate for multi line plot
+    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+
+      geom_point()+geom_line()+
+      guides(colour=guide_legend(title="Well",nrow=20))+
+      scale_x_continuous(limits=timeLimits())+
+      xlab("time [h]")+
+      ylab(input$label)
+    
+  })
+  plots[["background subtracted log"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()
     
@@ -315,8 +355,7 @@ shinyServer(function(input,output) {
       xlab("time [h]")+
       ylab(paste0("log ",input$label))
   })
-
-  output$growthRatePlot <- renderPlot({
+  plots[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()    
     pd = position_dodge(0.1)
@@ -332,14 +371,13 @@ shinyServer(function(input,output) {
       ylab("growth rate")
     return(p)
   })
-  
-  output$doublingTimePlot <- renderPlot({
+  plots[["doubling time vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()
     ggplotdata[,'ymax'] <- ggplotdata$value+ggplotdata$se
     ggplotdata[,'ymin'] <- ggplotdata$value-ggplotdata$se
     ggplotdata[,c('value','ymax','ymin')] <- lapply(ggplotdata[,c('value','ymax','ymin')],function(x) {log(2)*60/x})
-
+  
     pd = position_dodge(0.1)
     p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))
     if(input$errorBars) {
@@ -351,6 +389,8 @@ shinyServer(function(input,output) {
       scale_x_continuous(limits=timeLimits())+
       xlab("time [h]")+
       ylab("doubling time [min]")
-    return(p)
+    return(p)  
   })
+#  "growth rate vs. value",
+#  "doubling time vs. value"
 })
