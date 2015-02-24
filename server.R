@@ -174,11 +174,11 @@ shinyServer(function(input,output) {
       cols <- colnames(window)
       cols <- cols[cols!="Time"]
       window <- as.data.frame(window)
-      window[,"ones"] <- 1
       res <- list()
       for(col in cols) {
         data <- window[,col]
         data[which(!is.finite(data))] = NA
+        val <- mean(data[! is.na(data)])
         times <- window[,"Time"]
         times <- times[!is.na(data)]
         data <- data[!is.na(data)]
@@ -190,10 +190,12 @@ shinyServer(function(input,output) {
           } else {
             res[col] <- (summary(c)$coefficients)["times","Estimate"]
           }
-        res[paste0(col,'.std_err')]<-summary(c)$coefficients["times","Std. Error"]  
+          res[paste0(col,'.std_err')]<-summary(c)$coefficients["times","Std. Error"]  
         } else {
           res[col] <- NA
-          res[paste0(col,'.std_err')]<- NA        }
+          res[paste0(col,'.std_err')]<- NA
+        }
+        res[paste0(col,'.vals')]<- val
       }
       return(res)
     }
@@ -209,12 +211,14 @@ shinyServer(function(input,output) {
     }    
     
     std_errs = grep("std_err$",colnames(regs),value=TRUE)
+    vals = grep("vals$",colnames(regs),value=TRUE)
     
-    regs.long <- melt(regs,id.vars=c(std_errs,"Time"))# Reformat the data to be appropriate for multi line plot
+    regs.long <- melt(regs,id.vars=c(std_errs,vals,"Time"))# Reformat the data to be appropriate for multi line plot
     regs.long[,'se']=1
-    
+    regs.long[,'val']=1
     for (col in wells()) {
       regs.long[which(regs.long$variable==col),'se']=regs.long[which(regs.long$variable==col),paste0(col,".std_err")]
+      regs.long[which(regs.long$variable==col),'val']=regs.long[which(regs.long$variable==col),paste0(col,".vals")]
     }
     return(regs.long)
   })
@@ -371,6 +375,21 @@ shinyServer(function(input,output) {
       ylab("growth rate")
     return(p)
   })
+  plots[["growth rate vs. value"]] = reactive({
+    if(is.null(wells())) { return() }
+    ggplotdata <- rollingWindowRegression()
+    pd = position_dodge(0.1)
+    p <- ggplot(data=ggplotdata,aes(x=val,y=value,colour=variable,group=variable))
+    if(input$errorBars) {
+      p <- p+geom_errorbar(aes(ymax=value+se,ymin=value-se),width=.1,position=pd)
+    }
+    p <- p+geom_point(position=pd)+geom_line(position=pd)+
+      guides(colour=guide_legend(title="Well",nrow=20))+
+      scale_y_continuous(limits=c(-0.1,NA))+
+      xlab(paste0("log ",input$label))+
+      ylab("growth rate")
+    return(p)
+  })
   plots[["doubling time vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()
@@ -391,6 +410,23 @@ shinyServer(function(input,output) {
       ylab("doubling time [min]")
     return(p)  
   })
-#  "growth rate vs. value",
-#  "doubling time vs. value"
+  plots[["doubling time vs. value"]] = reactive({
+    if(is.null(wells())) { return() }
+    ggplotdata <- rollingWindowRegression()
+    ggplotdata[,'ymax'] <- ggplotdata$value+ggplotdata$se
+    ggplotdata[,'ymin'] <- ggplotdata$value-ggplotdata$se
+    ggplotdata[,c('value','ymax','ymin')] <- lapply(ggplotdata[,c('value','ymax','ymin')],function(x) {log(2)*60/x})
+    
+    pd = position_dodge(0.1)
+    p <- ggplot(data=ggplotdata,aes(x=val,y=value,colour=variable,group=variable))
+    if(input$errorBars) {
+      p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
+    }    
+    p <- p+geom_point(position=pd)+geom_line(position=pd)+
+      guides(colour=guide_legend(title="Well",nrow=20))+
+      scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
+      xlab(paste0("log ",input$label))+
+      ylab("doubling time [min]")
+    return(p)  
+  })
 })
