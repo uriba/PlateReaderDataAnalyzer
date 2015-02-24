@@ -3,9 +3,10 @@
 #find way to use multiple columns in plot.ly legend.
 #Color code input types + collapsable for cleaner UI.
 #Add help and documentation to web page
-#Add plots of growth rate/doubling time as function of log-OD
 #Add plots for expression levels
 #Add interactive graphs via highcharts
+#Set clear headlines for page according to analysis types
+#Support multiple files upload (through dropbox?)
 
 library(shiny)
 library(gdata)
@@ -17,12 +18,9 @@ library(plotly)
 labelSubset <- function(df,label) {
   readings <- as.numeric(rownames(df[df[,1] == "Cycle Nr.",]))
   endings <- as.numeric(rownames(df[df[,1] == "End Time:",]))
-  labelRow <- 0
+  labelRow <- max(as.numeric(rownames(df[grep(paste0(label,"$"),df[,1]),])))
   if(adjecantLabels(df)) {
-    labelRow <-as.numeric(rownames(df[df[,1]==label,]))
     endings <- as.numeric(rownames(df[df[,2] == "",]))
-  } else {
-    labelRow <- as.numeric(rownames(df[df[,1]==paste0("Label: ",label),]))
   }
   fromRow <- readings[readings > labelRow][1]
   endRow <- endings[endings>fromRow][1]
@@ -45,9 +43,8 @@ getPlateByLabel <- function(df,label) {
   plotData <- plotData[-1,] # Omit headings row
   plotData <- na.omit(plotData)
   colnames(plotData)[1] <- "Time" #Rename the time column so that it has a "nicer" name
-  plotData[] <- lapply(plotData,as.character) # Convert values to numeric
-  plotData[] <- lapply(plotData,as.numeric)
-  plotData[,"Time"] = plotData[,"Time"]/3600 # convert time to hours
+  plotData[] <- lapply(plotData,function(x) {as.numeric(as.character(x))}) # Convert values to numeric
+  plotData$Time = plotData$Time/3600 # convert time to hours
   return(plotData)
 }
 
@@ -98,7 +95,7 @@ shinyServer(function(input,output) {
     if(is.null(Data())) { return() }
     
     plotData <- Data()[[names(Data())[1]]]
-    cols <- c(colnames(plotData))
+    cols <- colnames(plotData)
     cols <- cols[cols != "Time"]
     
     if(input$wellsToAnalyse == "Wells") {
@@ -118,7 +115,6 @@ shinyServer(function(input,output) {
   })
   
   backgroundVals <- reactive({
-    if(is.null(Data())) { return() }
     if(is.null(input$label)) { return() }
     wellsData <- Data()[[input$label]]
     
