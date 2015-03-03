@@ -28,24 +28,24 @@ labelSubset <- function(df,label) {
 }
 
 getPlateByLabel <- function(df,label) {
-  plotData <- labelSubset(df,label)
-  if(dataInRows(plotData)) {
+  labelData <- labelSubset(df,label)
+  if(dataInRows(labelData)) {
     print("data in rows")
-    firstcol <- plotData[,1] # The first column contains the descriptors of the rows
-    plotData <- as.data.frame(t(plotData)) # Get the data to be in columns form
-    colnames(plotData) <- firstcol # Set the proper column names
+    firstcol <- labelData[,1] # The first column contains the descriptors of the rows
+    labelData <- as.data.frame(t(labelData)) # Get the data to be in columns form
+    colnames(labelData) <- firstcol # Set the proper column names
   } else {
     print("data in columns")
-    colnames(plotData) <- plotData[1,]
+    colnames(labelData) <- labelData[1,]
   }
-  irrelevantCols <- colnames(plotData)[grep("^Cycle|^Temp|^O2|^CO2",colnames(plotData))]
-  plotData <- plotData[,!(names(plotData) %in% irrelevantCols)]
-  plotData <- plotData[-1,] # Omit headings row
-  plotData <- na.omit(plotData)
-  colnames(plotData)[1] <- "Time" #Rename the time column so that it has a "nicer" name
-  plotData[] <- lapply(plotData,function(x) {as.numeric(as.character(x))}) # Convert values to numeric
-  plotData$Time = plotData$Time/3600 # convert time to hours
-  return(plotData)
+  irrelevantCols <- colnames(labelData)[grep("^Cycle|^Temp|^O2|^CO2",colnames(labelData))]
+  labelData <- labelData[,!(names(labelData) %in% irrelevantCols)]
+  labelData <- labelData[-1,] # Omit headings row
+  labelData <- na.omit(labelData)
+  colnames(labelData)[1] <- "Time" #Rename the time column so that it has a "nicer" name
+  labelData[] <- lapply(labelData,function(x) {as.numeric(as.character(x))}) # Convert values to numeric
+  labelData$Time = labelData$Time/3600 # convert time to hours
+  return(labelData)
 }
 
 dataInRows <- function(df) {
@@ -84,24 +84,21 @@ shinyServer(function(input,output) {
     version <- version[!is.na(version)]
     version <- version[2]
     print(version)
-    if(substring(version,1,15) == 'Tecan i-control') {
-      return(getReaderData(df))
-    } else { 
+    if(substring(version,1,15) != 'Tecan i-control')
       return(NULL)
-    }
+    return(getReaderData(df))
   })
   
   wells <- reactive({
     if(is.null(Data())) { return() }
     
-    plotData <- Data()[[names(Data())[1]]]
-    cols <- colnames(plotData)
+    labelData <- Data()[[names(Data())[1]]] #get wells from first label
+    cols <- colnames(labelData)
     cols <- cols[cols != "Time"]
     
     if(input$wellsToAnalyse == "Wells") {
       if(is.null(input$wells)) { return() }
-      cols <- strsplit(input$wells,',')
-      cols <- cols[[1]]
+      cols <- strsplit(input$wells,',')[[1]]
     }
     if(input$wellsToAnalyse == "Row") {
       if(is.null(input$row)) { return() }
@@ -124,21 +121,22 @@ shinyServer(function(input,output) {
     else if(input$backgroundMethod == "Average of first measurements of well") {
       blankVals <- lapply(wellsData[],function(x) {return (mean(head(x,as.numeric(input$perWellMesNum))))})
     }
-    else if(input$backgroundMethod == "Time average of blank wells") {
+    else {
       blankWells <- strsplit(input$blankWells,',')[[1]]
-      blankVals <- mean(colMeans(wellsData[,blankWells,drop=FALSE]))
-    }
-    else if(input$backgroundMethod == "Point-wise average of blank wells") {
-      blankWells <- strsplit(input$blankWells,',')[[1]]
-      blankVals <- rowMeans(wellsData[,blankWells,drop=FALSE])
+      if(input$backgroundMethod == "Time average of blank wells") {
+          blankVals <- mean(colMeans(wellsData[,blankWells,drop=FALSE]))
+      }
+      else if(input$backgroundMethod == "Point-wise average of blank wells") {
+        blankVals <- rowMeans(wellsData[,blankWells,drop=FALSE])
+      }
     }
     return(blankVals)
   })
   
   backgroundSubtracted <- reactive({
-    plotData <- Data()[[input$label]]
+    labelData <- Data()[[input$label]]
     cols <- wells()
-    wellsData <- plotData[,cols,drop=FALSE]
+    wellsData <- labelData[,wells(),drop=FALSE]
     blankVals <- backgroundVals()
     for(col in cols) {
       if(col %in% names(blankVals)) {
@@ -147,20 +145,19 @@ shinyServer(function(input,output) {
         wellsData[,col] <- wellsData[,col]-blankVals
       }
     }      
-    wellsData[,"Time"] <- plotData$Time
+    wellsData[,"Time"] = labelData$Time
     return(wellsData)
   })
   
   backgroundSubtractedLog <- reactive({
     bgSubtracted <- backgroundSubtracted()
-    print(wells())
-    bgSubtracted[,wells()] <- lapply(bgSubtracted[,wells()],log)
+    bgSubtracted[,wells()] <- lapply(bgSubtracted[,wells(),drop=FALSE],log)
     return(bgSubtracted)
   })  
   
   timeLimits <- reactive({
-    plotData <- Data()[[input$label]]
-    timesRange <- range(plotData$Time)
+    labelData <- Data()[[input$label]]
+    timesRange <- range(labelData$Time)
     delta <- timesRange[2]-timesRange[1]
     return(c(timesRange[1]-0.05*delta,timesRange[2]+0.05*delta))
   })
@@ -173,25 +170,20 @@ shinyServer(function(input,output) {
       res <- list()
       for(col in cols) {
         data <- window[,col]
-        data[which(!is.finite(data))] = NA
-        val <- mean(data[! is.na(data)])
         times <- window[,"Time"]
-        times <- times[!is.na(data)]
-        data <- data[!is.na(data)]
+        times <- times[is.finite(data)]
+        data <- data[is.finite(data)]
+        res[paste0(col,'.vals')]<-  mean(data)
+        res[col] <- NA
+        res[paste0(col,'.std_err')]<- NA
         if(length(data)>1) {
           c <- lm(data ~ times)
           rsq = summary(c)$r.squared
-          if(is.na(rsq) || rsq < as.numeric(input$rsquare)) {
-            res[col] <- NA
-          } else {
+          if(!is.na(rsq) && rsq > as.numeric(input$rsquare)) {
             res[col] <- (summary(c)$coefficients)["times","Estimate"]
           }
           res[paste0(col,'.std_err')]<-summary(c)$coefficients["times","Std. Error"]  
-        } else {
-          res[col] <- NA
-          res[paste0(col,'.std_err')]<- NA
         }
-        res[paste0(col,'.vals')]<- val
       }
       return(res)
     }
@@ -202,16 +194,13 @@ shinyServer(function(input,output) {
     regs <- rollapply(wellsData,width=windowSize,reg,by.column=FALSE)
     regs <- as.data.frame(regs,stringsAsFactors = FALSE)
     regs[,"Time"] <- as.numeric(head(wellsData$Time,length(regs[,1])))
-    for(col in colnames(regs)) {
-      regs[,col] <- as.numeric(regs[,col])
-    }    
+    regs[] = lapply(regs,as.numeric)
     
     std_errs = grep("std_err$",colnames(regs),value=TRUE)
     vals = grep("vals$",colnames(regs),value=TRUE)
     
     regs.long <- melt(regs,id.vars=c(std_errs,vals,"Time"))# Reformat the data to be appropriate for multi line plot
-    regs.long[,'se']=1
-    regs.long[,'val']=1
+    regs.long[,c('se','val')]=1 #assign standard error and value of measurement where regression was taken
     for (col in wells()) {
       regs.long[which(regs.long$variable==col),'se']=regs.long[which(regs.long$variable==col),paste0(col,".std_err")]
       regs.long[which(regs.long$variable==col),'val']=regs.long[which(regs.long$variable==col),paste0(col,".vals")]
@@ -271,22 +260,27 @@ shinyServer(function(input,output) {
     })
     do.call(tagList,plots_list)    
   })
-  
+
+  rawPlot <- function(label,plotData) {
+      ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
+      p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+geom_point()+geom_line()+
+        guides(colour=guide_legend(title="Well",nrow=20))+
+        xlab("time [h]")+
+        ylab(label)
+      return(p)
+  }
+
+ 
   for (i in 1:max_plots) { # generate plots for all the labels (up to 10 labels are allowed)
     local({
       my_i <- i
       output[[paste0("plot",my_i)]] <- renderPlot({
         if(is.null(wells())) { return() }
         if(input$analysisType == "Plate overview") {
+          if(my_i>length(names(Data()))) {return ()}
           label <- names(Data())[my_i]
           plotData <- Data()[[label]]    
-          plotData <- plotData[,c("Time",wells())]
-      
-          ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-          ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+geom_point()+geom_line()+
-            guides(colour=guide_legend(title="Well",nrow=20))+
-            xlab("time [h]")+
-            ylab(label)
+          return(rawPlot(label,plotData[,c("Time",wells())]))
         }
         else if(input$analysisType =="Growth rate analysis") {
           if(my_i>length(input$grPlots)) {return ()}
@@ -317,19 +311,14 @@ shinyServer(function(input,output) {
   })
   
   plots <- list()
+
   plots[["raw"]] <- reactive({
     if(is.null(wells())) { return() }
       label <- input$label
       plotData <- Data()[[label]]    
-      plotData <- plotData[,c("Time",wells())]
-      
-      ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-      p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+geom_point()+geom_line()+
-        guides(colour=guide_legend(title="Well",nrow=20))+
-        xlab("time [h]")+
-        ylab(label)
-      return(p)
+      return(rawPlot(label,plotData[,c("Time",wells())]))
   })
+
   plots[["background subtracted"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtracted()
