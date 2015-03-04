@@ -255,19 +255,23 @@ shinyServer(function(input,output) {
     }
     # for each label - create a plotOutput object with the appropriate name:
     plots_list <- lapply(1:plotsNum,function(i){
-      plotname <- paste0("plot",i)
-      plotOutput(plotname)
+      plotOutput(paste0("plot",i))
     })
     do.call(tagList,plots_list)    
   })
 
+  simplePlot <- function(label,data) {
+    pd = position_dodge(0.1)
+    return (ggplot(data=data,aes(x=Time,y=value,colour=variable,group=variable))+
+      geom_point(position=pd)+geom_line(position=pd)+
+      guides(colour=guide_legend(title="Well",nrow=20))+
+      xlab("time [h]")+
+      ylab(label))
+  }
+
   rawPlot <- function(label,plotData) {
       ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-      p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+geom_point()+geom_line()+
-        guides(colour=guide_legend(title="Well",nrow=20))+
-        xlab("time [h]")+
-        ylab(label)
-      return(p)
+      return(simplePlot(label,ggplotdata))
   }
 
  
@@ -290,6 +294,7 @@ shinyServer(function(input,output) {
     })  
   }
   
+#plot.ly chart
   output$plot <- renderUI({   
     if(is.null(wells())) { return() }
     plotData <- Data()[[input$label]]    
@@ -322,44 +327,28 @@ shinyServer(function(input,output) {
   plots[["background subtracted"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtracted()
-    
-    ggplotdata <- melt(wellsData,id="Time") # Reformat the data to be appropriate for multi line plot
-    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+
-      geom_point()+geom_line()+
-      guides(colour=guide_legend(title="Well",nrow=20))+
-      scale_x_continuous(limits=timeLimits())+
-      xlab("time [h]")+
-      ylab(input$label)
-    
+    return(rawPlot(input$label,wellsData) + scale_x_continuous(limits=timeLimits()))
   })
+
   plots[["background subtracted log"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()
-    
-    ggplotdata <- melt(wellsData,id="Time") # Reformat the data to be appropriate for multi line plot
-    ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+
-      geom_point()+geom_line()+
-      guides(colour=guide_legend(title="Well",nrow=20))+
-      scale_x_continuous(limits=timeLimits())+
-      xlab("time [h]")+
-      ylab(paste0("log ",input$label))
+    return(rawPlot(paste0("log ",input$label),wellsData) + scale_x_continuous(limits=timeLimits()))
   })
+
   plots[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()    
     pd = position_dodge(0.1)
-    p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))
+    p <- simplePlot("growth rate",ggplotdata)
     if(input$errorBars) {
       p <- p+geom_errorbar(aes(ymax=value+se,ymin=value-se),width=.1,position=pd)
     }
-    p <- p+geom_point(position=pd)+geom_line(position=pd)+
-      guides(colour=guide_legend(title="Well",nrow=20))+
-      scale_y_continuous(limits=c(-0.1,NA))+
-      scale_x_continuous(limits=timeLimits())+
-      xlab("time [h]")+
-      ylab("growth rate")
+    p <- p+ scale_y_continuous(limits=c(-0.1,NA))+
+      scale_x_continuous(limits=timeLimits())
     return(p)
   })
+
   plots[["growth rate vs. value"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()
@@ -383,18 +372,15 @@ shinyServer(function(input,output) {
     ggplotdata[,c('value','ymax','ymin')] <- lapply(ggplotdata[,c('value','ymax','ymin')],function(x) {log(2)*60/x})
   
     pd = position_dodge(0.1)
-    p <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))
+    p <- simplePlot("doubling time [min]",ggplotdata)
     if(input$errorBars) {
       p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
     }    
-    p <- p+geom_point(position=pd)+geom_line(position=pd)+
-      guides(colour=guide_legend(title="Well",nrow=20))+
-      scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
-      scale_x_continuous(limits=timeLimits())+
-      xlab("time [h]")+
-      ylab("doubling time [min]")
+    p <- p+ scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
+      scale_x_continuous(limits=timeLimits())
     return(p)  
   })
+
   plots[["doubling time vs. value"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()
