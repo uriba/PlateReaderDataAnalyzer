@@ -14,6 +14,7 @@ library(ggplot2)
 library(reshape2)
 library(zoo)
 library(plotly)
+library(rCharts)
 
 labelSubset <- function(df,label) {
   readings <- as.numeric(rownames(df[df[,1] == "Cycle Nr.",]))
@@ -293,26 +294,41 @@ shinyServer(function(input,output) {
       })
     })  
   }
-  
+
+ gg_color_hue <- function(n) {
+     hues = seq(15, 375, length=n+1)
+       hcl(h=hues, l=65, c=100)[1:n]
+ }
 #plot.ly chart
-  output$plot <- renderUI({   
+  #output$plot <- renderUI({   
+    #highcharts working demo
+  output$myChart <- renderChart({   
     if(is.null(wells())) { return() }
+    if(is.null(input$label)) { return() }
     plotData <- Data()[[input$label]]    
     plotData <- plotData[,c("Time",wells())]
     
     ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-    plt <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+
-      geom_point()+geom_line()+
-      guides(colour=guide_legend(title="Well",nrow=20))+
-      xlab("time [h]")+
-      ylab(input$label)
-    print("connecting")
-    py <- plotly("uri.barenholz","hvi3ma3m30","https://plot.ly")
-    print(py)
-    print("uploading")
-    res <- py$ggplotly(plt,kwargs=list(filename="rawmes",fileopt="overwrite",auto_open=FALSE))
-    print(res)
-    tags$iframe(src=res$response$url,frameborder="0",height=400,width=650)
+    p <- hPlot(x='Time',y='value', data=ggplotdata, group='variable',type='scatter')
+    p$chart(zoomType="xy")
+    p$exporting(enabled=T)
+    p$legend(layout='vertical',align="right",verticalAlign='top')
+    p$colors(gg_color_hue(length(wells())))
+    p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
+    p$set(dom='myChart')
+    return(p)
+    #plt <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+
+    #  geom_point()+geom_line()+
+    #  guides(colour=guide_legend(title="Well",nrow=20))+
+    #  xlab("time [h]")+
+    #  ylab(input$label)
+    #print("connecting")
+    #py <- plotly("uri.barenholz","hvi3ma3m30","https://plot.ly")
+    #print(py)
+    #print("uploading")
+    #res <- py$ggplotly(plt,kwargs=list(filename="rawmes",fileopt="overwrite",auto_open=FALSE))
+    #print(res)
+    #tags$iframe(src=res$response$url,frameborder="0",height=400,width=650)
   })
   
   plots <- list()

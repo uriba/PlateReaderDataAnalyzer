@@ -1,4 +1,5 @@
 library(shiny)
+require(rCharts)
 
 shinyUI(fluidPage(
   titlePanel("Plate Reader Data Analysis"),
@@ -31,7 +32,7 @@ shinyUI(fluidPage(
           selected = 1
           ),
         conditionalPanel(
-          condition='input.analysisType == "Growth rate analysis"',
+          condition='input.analysisType == "Growth rate analysis" || input.analysisType == "Plotly test"',
           htmlOutput("labelSelect"),
           selectInput(
             inputId = "backgroundMethod",
@@ -75,7 +76,7 @@ shinyUI(fluidPage(
         ),
       conditionalPanel(
         condition='input.analysisType == "Plotly test"',
-        htmlOutput("plot")
+        showOutput("myChart","highcharts")
         )
       )    
     )
