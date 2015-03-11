@@ -1,5 +1,7 @@
 #ToDo:
 #Integrate plot.ly as choice for output for export (given username and authentication key).
+#Add toggling of highcharts vs. normal charts.
+#Add update plots button?
 #find way to use multiple columns in plot.ly legend.
 #Color code input types + collapsable for cleaner UI.
 #Add help and documentation to web page
@@ -206,6 +208,8 @@ shinyServer(function(input,output) {
       regs.long[which(regs.long$variable==col),'se']=regs.long[which(regs.long$variable==col),paste0(col,".std_err")]
       regs.long[which(regs.long$variable==col),'val']=regs.long[which(regs.long$variable==col),paste0(col,".vals")]
     }
+    regs.long[,'ymax'] <- regs.long$value+regs.long$se
+    regs.long[,'ymin'] <- regs.long$value-regs.long$se
     return(regs.long)
   })
   
@@ -358,7 +362,7 @@ shinyServer(function(input,output) {
     pd = position_dodge(0.1)
     p <- simplePlot("growth rate",ggplotdata)
     if(input$errorBars) {
-      p <- p+geom_errorbar(aes(ymax=value+se,ymin=value-se),width=.1,position=pd)
+      p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
     }
     p <- p+ scale_y_continuous(limits=c(-0.1,NA))+
       scale_x_continuous(limits=timeLimits())
@@ -371,7 +375,7 @@ shinyServer(function(input,output) {
     pd = position_dodge(0.1)
     p <- ggplot(data=ggplotdata,aes(x=val,y=value,colour=variable,group=variable))
     if(input$errorBars) {
-      p <- p+geom_errorbar(aes(ymax=value+se,ymin=value-se),width=.1,position=pd)
+      p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
     }
     p <- p+geom_point(position=pd)+geom_line(position=pd)+
       guides(colour=guide_legend(title="Well",nrow=20))+
@@ -383,8 +387,6 @@ shinyServer(function(input,output) {
   plots[["doubling time vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()
-    ggplotdata[,'ymax'] <- ggplotdata$value+ggplotdata$se
-    ggplotdata[,'ymin'] <- ggplotdata$value-ggplotdata$se
     ggplotdata[,c('value','ymax','ymin')] <- lapply(ggplotdata[,c('value','ymax','ymin')],function(x) {log(2)*60/x})
   
     pd = position_dodge(0.1)
@@ -400,8 +402,6 @@ shinyServer(function(input,output) {
   plots[["doubling time vs. value"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()
-    ggplotdata[,'ymax'] <- ggplotdata$value+ggplotdata$se
-    ggplotdata[,'ymin'] <- ggplotdata$value-ggplotdata$se
     ggplotdata[,c('value','ymax','ymin')] <- lapply(ggplotdata[,c('value','ymax','ymin')],function(x) {log(2)*60/x})
     
     pd = position_dodge(0.1)
