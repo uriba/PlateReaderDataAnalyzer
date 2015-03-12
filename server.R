@@ -212,7 +212,13 @@ shinyServer(function(input,output) {
     regs.long[,'ymin'] <- regs.long$value-regs.long$se
     return(regs.long)
   })
-  
+
+  dtRegression <- reactive({
+    plotData <- rollingWindowRegression()
+    plotData[,c('value','ymax','ymin')] <- lapply(plotData[,c('value','ymax','ymin')],grToDt)
+    return (plotData)
+  })
+
   output$fileUploaded <- reactive ({
     return (! is.null(Data()))
   })
@@ -384,10 +390,12 @@ shinyServer(function(input,output) {
       ylab("growth rate")
     return(p)
   })
+
+  grToDt <- function(x) {return(log(2)*60/x)}
+  
   plots[["doubling time vs. time"]] = reactive({
     if(is.null(wells())) { return() }
-    ggplotdata <- rollingWindowRegression()
-    ggplotdata[,c('value','ymax','ymin')] <- lapply(ggplotdata[,c('value','ymax','ymin')],function(x) {log(2)*60/x})
+    ggplotdata <- dtRegression()
   
     pd = position_dodge(0.1)
     p <- simplePlot("doubling time [min]",ggplotdata)
@@ -401,8 +409,7 @@ shinyServer(function(input,output) {
 
   plots[["doubling time vs. value"]] = reactive({
     if(is.null(wells())) { return() }
-    ggplotdata <- rollingWindowRegression()
-    ggplotdata[,c('value','ymax','ymin')] <- lapply(ggplotdata[,c('value','ymax','ymin')],function(x) {log(2)*60/x})
+    ggplotdata <- dtRegression()
     
     pd = position_dodge(0.1)
     p <- ggplot(data=ggplotdata,aes(x=val,y=value,colour=variable,group=variable))
