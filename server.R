@@ -18,62 +18,8 @@ library(zoo)
 library(plotly)
 library(rCharts)
 
-labelSubset <- function(df,label) {
-  readings <- as.numeric(rownames(df[df[,1] == "Cycle Nr.",]))
-  endings <- as.numeric(rownames(df[df[,1] == "End Time:",]))
-  labelRow <- max(as.numeric(rownames(df[grep(paste0(label,"$"),df[,1]),])))
-  if(adjecantLabels(df)) {
-    endings <- as.numeric(rownames(df[df[,2] == "",]))
-  }
-  fromRow <- readings[readings > labelRow][1]
-  endRow <- endings[endings>fromRow][1]
-  return(df[(fromRow):(endRow-1),])
-}
+source('tecanProcess.R')
 
-getPlateByLabel <- function(df,label) {
-  labelData <- labelSubset(df,label)
-  if(dataInRows(labelData)) {
-    print("data in rows")
-    firstcol <- labelData[,1] # The first column contains the descriptors of the rows
-    labelData <- as.data.frame(t(labelData)) # Get the data to be in columns form
-    colnames(labelData) <- firstcol # Set the proper column names
-  } else {
-    print("data in columns")
-    colnames(labelData) <- labelData[1,]
-  }
-  irrelevantCols <- colnames(labelData)[grep("^Cycle|^Temp|^O2|^CO2",colnames(labelData))]
-  labelData <- labelData[,!(names(labelData) %in% irrelevantCols)]
-  labelData <- labelData[-1,] # Omit headings row
-  labelData <- na.omit(labelData)
-  colnames(labelData)[1] <- "Time" #Rename the time column so that it has a "nicer" name
-  labelData[] <- lapply(labelData,function(x) {as.numeric(as.character(x))}) # Convert values to numeric
-  labelData$Time = labelData$Time/3600 # convert time to hours
-  return(labelData)
-}
-
-dataInRows <- function(df) {
-  return(df[2,1] != "1")
-}
-
-adjecantLabels <- function(df) {
-  return(length(df[grep("^Label: ",df[,1]),1]) == 0)
-}
-
-getReaderData <- function(df) {
-  df[df=="OVER"] <- "71000"
-  labels <- df[grep("^Label: ",df[,1]),1]
-  labels <- substring(labels,8)
-  if(adjecantLabels(df)) {
-    labels <- as.character(df[as.numeric(rownames(df[df[,1]=="Cycle Nr.",]))-1,1]) #in this version labels are two lines above measurement tables
-  }
-  print(labels)
-  measurements <- vector(mode = "list", length = length(labels))
-  names(measurements) <- labels
-  for (label in labels) {
-    measurements[[label]] <- getPlateByLabel(df,label)
-  }
-  return(measurements)  
-}
 max_plots <- 10
 
 shinyServer(function(input,output) {
@@ -81,15 +27,7 @@ shinyServer(function(input,output) {
     inFile <- input$datafile
     if (is.null(inFile))
       return(NULL)
-    df <- read.xls(inFile$datapath,stringsAsFactors=FALSE,header=FALSE)
-    version <- df[1,]
-    version <- version[version != ""]
-    version <- version[!is.na(version)]
-    version <- version[2]
-    print(version)
-    if(substring(version,1,15) != 'Tecan i-control')
-      return(NULL)
-    return(getReaderData(df))
+    return(processReaderFile(inFile$datapath))
   })
   
   wells <- reactive({
