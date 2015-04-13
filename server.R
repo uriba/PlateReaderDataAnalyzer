@@ -23,11 +23,30 @@ source('tecanProcess.R')
 max_plots <- 10
 
 shinyServer(function(input,output) {
+  MultifileData <- reactive({
+    platesnum <- as.numeric(input$platesnum)
+    if (is.na(platesnum)){
+      return(NULL)
+    } else {
+      return(readMultiFiles(input$datafile$datapath,platesnum))
+    }
+  })
+
+  output$MultiFile <- reactive ({ 
+    inFile <- input$datafile
+    return((!is.null(inFile)) && (length(inFile$datapath) > 1))
+  })
+
   Data <- reactive({
+    print(input$datafile)
     inFile <- input$datafile
     if (is.null(inFile))
       return(NULL)
-    return(processReaderFile(inFile$datapath))
+    if(length(inFile$datapath) == 1) {
+      return(readSingleFile(inFile$datapath))
+    } else {
+      return(MultifileData()[[as.numeric(input$platenum)]])
+    }
   })
   
   wells <- reactive({
@@ -162,6 +181,7 @@ shinyServer(function(input,output) {
   })
   
   outputOptions(output,'fileUploaded',suspendWhenHidden=FALSE)
+  outputOptions(output,'MultiFile',suspendWhenHidden=FALSE)
 
   output$labelSelect <- renderUI({ 
     if(is.null(Data())) { return() }

@@ -5,7 +5,12 @@ shinyUI(fluidPage(
   titlePanel("Plate Reader Data Analysis"),
   sidebarLayout(
     sidebarPanel(
-      fileInput("datafile","Excel reader data file:"),
+      fileInput("datafile","Excel reader data file:",multiple=TRUE),
+      conditionalPanel(
+        condition="output.MultiFile",
+        textInput("platesnum","Number of plates",value=""),
+        textInput("platenum","Plate to analyze",value="1")
+      ),
       conditionalPanel(
         condition="output.fileUploaded",
         selectInput(
