@@ -6,9 +6,17 @@
 #Color code input types + collapsable for cleaner UI.
 #Add help and documentation to web page
 #Add plots for expression levels
-#Add interactive graphs via highcharts
+## selection of channels
+## selection of background method per channel
+## available graphs: fluorescence / od
+## fluorescence change / od change (where the cells aim to)
+## fluorescence change / od (rate of production).
 #Set clear headlines for page according to analysis types
-#Support multiple files upload (through dropbox?)
+#correct axes for multiple files
+#allow selection of graph display on top of every graph (simple, interactive, plot.ly)
+#tooltip help
+#default graphs display in GR analysis
+#specify plate layout as second sheet in excel file or in main sheet
 
 library(shiny)
 library(gdata)
