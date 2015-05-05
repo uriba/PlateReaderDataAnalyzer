@@ -20,7 +20,6 @@
 #display (interactive?) plate layout
 #support multiple plate layout styles/files
 #add links to download/use sample files
-#format html of main page
 
 library(shiny)
 library(gdata)
