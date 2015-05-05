@@ -16,7 +16,11 @@
 #allow selection of graph display on top of every graph (simple, interactive, plot.ly)
 #tooltip help
 #default graphs display in GR analysis
-#specify plate layout as second sheet in excel file or in main sheet
+#support plate layout in interactive graphs
+#display (interactive?) plate layout
+#support multiple plate layout styles/files
+#add links to download/use sample files
+#format html of main page
 
 library(shiny)
 library(gdata)
