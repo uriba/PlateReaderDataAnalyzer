@@ -15,6 +15,8 @@ shinyUI(fluidPage(
       ),
       conditionalPanel(
         condition="output.fileUploaded",
+        bsTooltip(id="descfile",title="Upload optional plate description file (Excel) to label wells",placement="right", trigger="hover"),
+        fileInput("descfile","Plate description file"),
         selectInput(
           inputId = "wellsToAnalyse",
           label = "Wells to analyse",
