@@ -15,7 +15,6 @@
 #correct axes for multiple files
 #allow selection of graph display on top of every graph (simple, interactive, plot.ly)
 #tooltip help
-#default graphs display in GR analysis
 #support plate layout in interactive graphs
 #display (interactive?) plate layout
 #support multiple plate layout styles/files
@@ -257,7 +256,6 @@ shinyServer(function(input,output) {
     }
     # for each label - create a plotOutput object with the appropriate name:
     plots_list <- lapply(1:plotsNum,function(i){
-                         print(names(input))
                          plotstylename <- paste0("plotstyle",i)
                          plot = plotOutput(paste0("plot",i))
                          if(plotstylename %in% names(input) && input[[plotstylename]] == "interactive") {

@@ -16,7 +16,7 @@ multiFileMeasurementTime <- function(df,label) {
   labelRow <- max(as.numeric(rownames(df[grep(paste0(label,"$"),df[,1]),])))
   times <- as.numeric(rownames(df[df[,1] == "Start Time:",]))
   timeRow = times[times>labelRow][1]
-  return(strftime(strptime(df[timeRow,2],format="%d/%m/%Y %H:%M:%S")))
+  return(as.numeric(strptime(df[timeRow,2],format="%d/%m/%Y %H:%M:%S")))
 }
 
 multiFile <- function(df) {
@@ -30,6 +30,7 @@ multiread <- function(df) {
 getMultiread <- function(df) {
   wells <- df[-1,1]
   means <- df[-1,2]
+  means <- as.numeric(means)
   names(means) <- wells
   return(means)
 }
@@ -41,7 +42,7 @@ getMatrixRead <- function(df) {
   res <- c()
   for(c in colnames(df))
     for(r in rownames(df))
-      res[paste0(r,c)] = df[r,c]
+      res[paste0(r,c)] = as.numeric(df[r,c])
   return(res)
 }
 
@@ -128,7 +129,7 @@ readMultiFiles <- function(filepath,platesnum) {
       for(label in labels) {
         labelData <- labelSubset(df,label)
         time <- multiFileMeasurementTime(df,label)
-        times[[label]] <- append(times[[label]],time)
+        times[[label]] <- append(times[[label]],as.character(time))
         if(multiread(labelData)){
           data <- getMultiread(labelData)
         }
@@ -137,9 +138,9 @@ readMultiFiles <- function(filepath,platesnum) {
         }
         if(length(measurements[[label]]) == 0) {
           measurements[[label]] <- data.frame(data)
-          colnames(measurements[[label]]) <- time
+          colnames(measurements[[label]]) <- as.character(time)
         } else {
-          measurements[[label]][[time]] <- data
+          measurements[[label]][[as.character(time)]] <- data
           wells <- names(data)
         }
       }
@@ -147,10 +148,12 @@ readMultiFiles <- function(filepath,platesnum) {
     for(label in labels) {
       times <- colnames(measurements[[label]])
       measurements[[label]] <- t(measurements[[label]])
-      rownames(measurements[[label]]) <- times
+      rownames(measurements[[label]]) <- as.numeric(times)
       colnames(measurements[[label]]) <- wells
       measurements[[label]] <- as.data.frame(measurements[[label]])
-      measurements[[label]]$Time <- times
+      measurements[[label]]$Time <- as.numeric(times)
+      measurements[[label]]$Time <- (measurements[[label]]$Time - min(measurements[[label]]$Time))/3600
+      measurements[[label]] <- measurements[[label]][order(measurements[[label]]$Time),]
     }
     retval[[i]] <- measurements
   }
