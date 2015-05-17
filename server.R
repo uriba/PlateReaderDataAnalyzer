@@ -318,6 +318,7 @@ shinyServer(function(input,output) {
           if(my_i>length(names(Data()))) {return ()}
           label <- names(Data())[my_i]
           plotData <- Data()[[label]]    
+          plotData <- plotData[,c("Time",wells())]
           ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
           p <- hPlot(x='Time',y='value', data=ggplotdata, group='variable',type='scatter')
           p$chart(zoomType="xy")
