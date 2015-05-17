@@ -87,6 +87,14 @@ shinyUI(fluidPage(
         includeHTML("welcome.html")
         ),
       conditionalPanel(
+        condition='output.fileUploaded && (input.analysisType == "Growth rate analysis")', 
+        h3("Growth rate analysis")
+        ),
+      conditionalPanel(
+        condition='output.fileUploaded && (input.analysisType == "Plate overview")', 
+        h3("Plate overview")
+        ),
+      conditionalPanel(
         condition='(input.analysisType == "Plate overview") || (input.analysisType == "Growth rate analysis")', 
         htmlOutput("plots")
         ),

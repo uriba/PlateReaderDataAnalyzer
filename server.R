@@ -1,8 +1,8 @@
 #ToDo:
 #Integrate plot.ly as choice for output for export (given username and authentication key).
-#Add toggling of highcharts vs. normal charts.
-#Add update plots button?
 #find way to use multiple columns in plot.ly legend.
+#allow selection of graph display on top of every graph (simple, interactive, plot.ly)
+#Add update plots button?
 #Color code input types + collapsable for cleaner UI.
 #Add help and documentation to web page
 #Add plots for expression levels
@@ -12,8 +12,6 @@
 ## fluorescence change / od change (where the cells aim to)
 ## fluorescence change / od (rate of production).
 #Set clear headlines for page according to analysis types
-#correct axes for multiple files
-#allow selection of graph display on top of every graph (simple, interactive, plot.ly)
 #tooltip help
 #support plate layout in interactive graphs
 #display (interactive?) plate layout
@@ -259,7 +257,7 @@ shinyServer(function(input,output) {
                          plotstylename <- paste0("plotstyle",i)
                          plot = plotOutput(paste0("plot",i))
                          if(plotstylename %in% names(input) && input[[plotstylename]] == "interactive") {
-                             plot = NULL
+                             plot = showOutput(paste0("chart",i),"highcharts")
                            }
       tagList(uiOutput(plotstylename), plot)
     })
@@ -288,11 +286,12 @@ shinyServer(function(input,output) {
      local({
        my_i <- i
       plotstylename <- paste0("plotstyle",my_i)
-      output[[plotstylename]] <- renderUI({selectInput(
+      output[[plotstylename]] <- renderUI({
+        selectInput(
                 inputId = plotstylename,
                 label = "Graph display",
                 choices = c("standard","interactive"),
-                selected = 1)})
+                selected = input[[plotstylename]])})
      })
    }
 
@@ -311,6 +310,27 @@ shinyServer(function(input,output) {
         else if(input$analysisType =="Growth rate analysis") {
           if(my_i>length(input$grPlots)) {return ()}
           return(plots[[input$grPlots[my_i]]]())
+        }
+      })
+      output[[paste0("chart",my_i)]] <- renderChart({
+        if(is.null(wells())) { return() }
+        if(input$analysisType == "Plate overview") {
+          if(my_i>length(names(Data()))) {return ()}
+          label <- names(Data())[my_i]
+          plotData <- Data()[[label]]    
+          ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
+          p <- hPlot(x='Time',y='value', data=ggplotdata, group='variable',type='scatter')
+          p$chart(zoomType="xy")
+          p$exporting(enabled=T)
+          p$legend(layout='vertical',align="right",verticalAlign='top')
+          p$colors(gg_color_hue(length(wells())))
+          p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
+          p$set(dom=paste0("chart",my_i))
+          return(p)
+        }
+        else if(input$analysisType =="Growth rate analysis") {
+          if(my_i>length(input$grPlots)) {return ()}
+          #return(plots[[input$grPlots[my_i]]]())
         }
       })
     })  
