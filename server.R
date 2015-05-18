@@ -397,7 +397,7 @@ shinyServer(function(input,output) {
     if(is.null(wells())) { return() }
       label <- input$label
       plotData <- Data()[[label]]
-      return(rawPlot(label,plotData[,c("Time",wells())],WellsDesc()))
+      return(rawChart(label,plotData[,c("Time",wells())],WellsDesc()))
   })
 
   plots[["background subtracted"]] = reactive({
