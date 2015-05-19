@@ -284,6 +284,8 @@ shinyServer(function(input,output) {
       colorNum <- length(unique(data$variable))
     p$colors(gg_color_hue(colorNum))
     p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
+    p$xAxis(title=list(text="time [h]"))
+    p$yAxis(title=list(text=label))
     return(p)
   }
 
@@ -470,12 +472,12 @@ shinyServer(function(input,output) {
       colorNum <- length(unique(ggplotdata$variable))
     p$colors(gg_color_hue(colorNum))
     p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
+    p$xAxis(title=list(text=paste0("log ",input$label)))
+    p$yAxis(title=list(text="growth rate"))
  
     #if(input$errorBars) {
     #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
     #}
-      #xlab(paste0("log ",input$label))+
-      #ylab("growth rate")
     return(p)
   })
 
@@ -539,14 +541,13 @@ shinyServer(function(input,output) {
       colorNum <- length(unique(ggplotdata$variable))
     p$colors(gg_color_hue(colorNum))
     p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
- 
+    p$xAxis(title=list(text=paste0("log ",input$label)))
+    p$yAxis(title=list(text="doubling time [min]"))
 
     #if(input$errorBars) {
     #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
     #}    
       #scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
-      #xlab(paste0("log ",input$label))+
-      #ylab("doubling time [min]")
     return(p)  
   })
 })
