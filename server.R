@@ -360,27 +360,25 @@ shinyServer(function(input,output) {
        hcl(h=hues, l=65, c=100)[1:n]
  }
 #plot.ly chart
-  #output$plot <- renderUI({   
-    #highcharts working demo
-  output$myChart <- renderChart({   
+  output$plot <- renderUI({   
     if(is.null(wells())) { return() }
     if(is.null(input$label)) { return() }
     plotData <- Data()[[input$label]]    
     plotData <- plotData[,c("Time",wells())]
     
     ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-    #plt <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+
-    #  geom_point()+geom_line()+
-    #  guides(colour=guide_legend(title="Well",nrow=20))+
-    #  xlab("time [h]")+
-    #  ylab(input$label)
-    #print("connecting")
-    #py <- plotly("uri.barenholz","hvi3ma3m30","https://plot.ly")
-    #print(py)
-    #print("uploading")
-    #res <- py$ggplotly(plt,kwargs=list(filename="rawmes",fileopt="overwrite",auto_open=FALSE))
-    #print(res)
-    #tags$iframe(src=res$response$url,frameborder="0",height=400,width=650)
+    plt <- ggplot(data=ggplotdata,aes(x=Time,y=value,colour=variable,group=variable))+
+      geom_point()+geom_line()+
+      guides(colour=guide_legend(title="Well",nrow=20))+
+      xlab("time [h]")+
+      ylab(input$label)
+    print("connecting")
+    py <- plotly("uri.barenholz","hvi3ma3m30","https://plot.ly")
+    print(py)
+    print("uploading")
+    res <- py$ggplotly(plt,kwargs=list(filename="rawmes",fileopt="overwrite",auto_open=FALSE))
+    print(res)
+    tags$iframe(src=res$response$url,frameborder="0",height=400,width=650)
   })
   
   plots <- list()
@@ -460,6 +458,28 @@ shinyServer(function(input,output) {
     return(p)
   })
 
+  charts[["growth rate vs. value"]] = reactive({
+    if(is.null(wells())) { return() }
+    ggplotdata <- rollingWindowRegression()
+    p <- hPlot(x='val',y='value', data=ggplotdata, group='variable',type='scatter')
+    p$chart(zoomType="xy")
+    p$exporting(enabled=T)
+    p$legend(layout='vertical',align="right",verticalAlign='top')
+    colorNum <- length(WellsDesc())
+    if(is.null(WellsDesc()))
+      colorNum <- length(unique(ggplotdata$variable))
+    p$colors(gg_color_hue(colorNum))
+    p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
+ 
+    #if(input$errorBars) {
+    #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
+    #}
+      #xlab(paste0("log ",input$label))+
+      #ylab("growth rate")
+    return(p)
+  })
+
+
   grToDt <- function(x) {return(log(2)*60/x)}
   
   plots[["doubling time vs. time"]] = reactive({
@@ -473,6 +493,19 @@ shinyServer(function(input,output) {
     }    
     p <- p+ scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
       scale_x_continuous(limits=timeLimits())
+    return(p)  
+  })
+
+  charts[["doubling time vs. time"]] = reactive({
+    if(is.null(wells())) { return() }
+    ggplotdata <- dtRegression()
+  
+    p <- simpleChart("doubling time [min]",ggplotdata,WellsDesc())
+    #if(input$errorBars) {
+    #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
+    #}    
+    #p <- p+ scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
+    #  scale_x_continuous(limits=timeLimits())
     return(p)  
   })
 
@@ -490,6 +523,30 @@ shinyServer(function(input,output) {
       scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
       xlab(paste0("log ",input$label))+
       ylab("doubling time [min]")
+    return(p)  
+  })
+  
+  charts[["doubling time vs. value"]] = reactive({
+    if(is.null(wells())) { return() }
+    ggplotdata <- dtRegression()
+
+    p <- hPlot(x='val',y='value', data=ggplotdata, group='variable',type='scatter')
+    p$chart(zoomType="xy")
+    p$exporting(enabled=T)
+    p$legend(layout='vertical',align="right",verticalAlign='top')
+    colorNum <- length(WellsDesc())
+    if(is.null(WellsDesc()))
+      colorNum <- length(unique(ggplotdata$variable))
+    p$colors(gg_color_hue(colorNum))
+    p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
+ 
+
+    #if(input$errorBars) {
+    #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
+    #}    
+      #scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
+      #xlab(paste0("log ",input$label))+
+      #ylab("doubling time [min]")
     return(p)  
   })
 })
