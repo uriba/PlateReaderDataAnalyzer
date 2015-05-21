@@ -1,7 +1,7 @@
 #ToDo:
 #Integrate plot.ly as choice for output for export (given username and authentication key).
 #find way to use multiple columns in plot.ly legend.
-#allow selection of graph display on top of every graph (simple, interactive, plot.ly)
+#allow selection of graph display on top of every graph (simple, interactive, plot.ly, table)
 #Add update plots button?
 #Color code input types + collapsable for cleaner UI.
 #Add help and documentation to web page
@@ -17,6 +17,7 @@
 #display (interactive?) plate layout
 #support multiple plate layout styles/files
 #add links to download/use sample files
+#support error bars on interactive graphs.
 
 library(shiny)
 library(gdata)
@@ -409,7 +410,10 @@ shinyServer(function(input,output) {
   charts[["background subtracted"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtracted()
-    return(rawChart(input$label,wellsData,WellsDesc()))
+    p <-rawChart(input$label,wellsData,WellsDesc())
+    limits <- timeLimits()
+    p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
+    return(p)
   })
 
   plots[["background subtracted log"]] = reactive({
@@ -421,7 +425,10 @@ shinyServer(function(input,output) {
   charts[["background subtracted log"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()
-    return(rawChart(paste0("log ",input$label),wellsData,WellsDesc()))
+    p <- rawChart(paste0("log ",input$label),wellsData,WellsDesc())
+    limits <- timeLimits()
+    p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
+    return(p)
   })
 
   plots[["growth rate vs. time"]] = reactive({
@@ -440,7 +447,10 @@ shinyServer(function(input,output) {
   charts[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()    
-    p <- simpleChart("growth rate",ggplotdata,WellsDesc())
+    p <- simpleChart("",ggplotdata,WellsDesc())
+    limits <- timeLimits()
+    p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
+    p$yAxis(title=list(text="growth rate"),floor=-0.1)
     return(p)
   })
 
@@ -473,7 +483,7 @@ shinyServer(function(input,output) {
     p$colors(gg_color_hue(colorNum))
     p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
     p$xAxis(title=list(text=paste0("log ",input$label)))
-    p$yAxis(title=list(text="growth rate"))
+    p$yAxis(title=list(text="growth rate"),floor=-0.1)
  
     #if(input$errorBars) {
     #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
@@ -502,13 +512,15 @@ shinyServer(function(input,output) {
     if(is.null(wells())) { return() }
     ggplotdata <- dtRegression()
   
-    p <- simpleChart("doubling time [min]",ggplotdata,WellsDesc())
+    p <- simpleChart("",ggplotdata,WellsDesc())
+    limits <- timeLimits()
+    p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
+    p$yAxis(title=list(text="doubling time [min]"),floor=-10,ceiling=as.numeric(input$maxdtime))
+    return(p)
     #if(input$errorBars) {
     #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
     #}    
     #p <- p+ scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
-    #  scale_x_continuous(limits=timeLimits())
-    return(p)  
   })
 
   plots[["doubling time vs. value"]] = reactive({
@@ -542,7 +554,7 @@ shinyServer(function(input,output) {
     p$colors(gg_color_hue(colorNum))
     p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
     p$xAxis(title=list(text=paste0("log ",input$label)))
-    p$yAxis(title=list(text="doubling time [min]"))
+    p$yAxis(title=list(text="doubling time [min]"),floor=-10,ceiling=as.numeric(input$maxdtime))
 
     #if(input$errorBars) {
     #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
