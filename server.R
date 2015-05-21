@@ -18,6 +18,7 @@
 #support multiple plate layout styles/files
 #add links to download/use sample files
 #support error bars on interactive graphs.
+#accelerate by using reactive melted data and manipulate it.
 
 library(shiny)
 library(gdata)
@@ -26,6 +27,7 @@ library(reshape2)
 library(zoo)
 library(plotly)
 library(rCharts)
+library(foreach)
 
 source('tecanProcess.R')
 
@@ -447,10 +449,42 @@ shinyServer(function(input,output) {
   charts[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()    
-    p <- simpleChart("",ggplotdata,WellsDesc())
+    p <- Highcharts$new()
+    p$chart(zoomType="xy")
+    p$exporting(enabled=T)
+    p$legend(layout='vertical',align="right",verticalAlign='top')
+    colorNum <- length(WellsDesc())
+    if(is.null(WellsDesc()))
+      colorNum <- length(unique(ggplotdata$variable))
+    p$colors(gg_color_hue(colorNum))
     limits <- timeLimits()
     p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
     p$yAxis(title=list(text="growth rate"),floor=-0.1)
+    splitted <- split(ggplotdata,ggplotdata$variable)
+    series <- foreach(group = names(splitted),.combine=append) %do% {
+      wellData <- splitted[[group]]
+      if(nrow(wellData) == 0) return(NULL)
+      list(
+          list(
+               name=group,
+               type='scatter',
+               #data=toJSONArray2(wellData,json=FALSE)#,
+               data=foreach(i=1:nrow(wellData)) %do% {
+                 return(c(wellData$Time[i],wellData$value[i]))
+               }
+               #tooltip=
+          ),
+          list(
+               name=group,
+               type='errorbar',
+               data=foreach(i=1:nrow(wellData)) %do% {
+                 return(c(wellData$Time[i],c(wellData$value[i]-wellData$se[i],
+                                             wellData$value[i]+wellData$se[i])))
+               }
+          )
+      )
+    }
+    p$series(series)
     return(p)
   })
 
