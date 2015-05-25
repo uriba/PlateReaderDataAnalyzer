@@ -445,22 +445,20 @@ shinyServer(function(input,output) {
       scale_x_continuous(limits=timeLimits())
     return(p)
   })
-
-  charts[["growth rate vs. time"]] = reactive({
-    if(is.null(wells())) { return() }
-    ggplotdata <- rollingWindowRegression()    
+  
+  timeSeriesChart <- function(plotData,label,ylimits) {
     p <- Highcharts$new()
     p$chart(zoomType="xy")
     p$exporting(enabled=T)
     p$legend(layout='vertical',align="right",verticalAlign='top')
     colorNum <- length(WellsDesc())
     if(is.null(WellsDesc()))
-      colorNum <- length(unique(ggplotdata$variable))
+      colorNum <- length(unique(plotData$variable))
     p$colors(gg_color_hue(colorNum))
     limits <- timeLimits()
     p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
-    p$yAxis(title=list(text="growth rate"),floor=-0.1)
-    splitted <- split(ggplotdata,ggplotdata$variable)
+    p$yAxis(title=list(text=label),floor=ylimits[1],ceiling=ylimits[2])
+    splitted <- split(plotData,plotData$variable)
     series <- foreach(group = names(splitted),.combine=append) %do% {
       wellData <- splitted[[group]]
       if(nrow(wellData) == 0) return(NULL)
@@ -478,14 +476,20 @@ shinyServer(function(input,output) {
                name=group,
                type='errorbar',
                data=foreach(i=1:nrow(wellData)) %do% {
-                 return(c(wellData$Time[i],c(wellData$value[i]-wellData$se[i],
-                                             wellData$value[i]+wellData$se[i])))
+                 return(c(wellData$Time[i],c(wellData$ymin[i],
+                                             wellData$ymax[i])))
                }
           )) else NULL
       )
     }
     p$series(series)
     return(p)
+  }
+
+  charts[["growth rate vs. time"]] = reactive({
+    if(is.null(wells())) { return() }
+    ggplotdata <- rollingWindowRegression()    
+    return(timeSeriesChart(ggplotdata,"growth rate",c(-0.1)))
   })
 
   plots[["growth rate vs. value"]] = reactive({
@@ -545,16 +549,7 @@ shinyServer(function(input,output) {
   charts[["doubling time vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- dtRegression()
-  
-    p <- simpleChart("",ggplotdata,WellsDesc())
-    limits <- timeLimits()
-    p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
-    p$yAxis(title=list(text="doubling time [min]"),floor=-10,ceiling=as.numeric(input$maxdtime))
-    return(p)
-    #if(input$errorBars) {
-    #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
-    #}    
-    #p <- p+ scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
+    return(timeSeriesChart(ggplotdata,"doubling time [min]",c(-10,as.numeric(input$maxdtime))))
   })
 
   plots[["doubling time vs. value"]] = reactive({
