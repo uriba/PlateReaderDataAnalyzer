@@ -464,16 +464,16 @@ shinyServer(function(input,output) {
     series <- foreach(group = names(splitted),.combine=append) %do% {
       wellData <- splitted[[group]]
       if(nrow(wellData) == 0) return(NULL)
-      list(
-          list(
-               name=group,
-               type='scatter',
-               #data=toJSONArray2(wellData,json=FALSE)#,
-               data=foreach(i=1:nrow(wellData)) %do% {
-                 return(c(wellData$Time[i],wellData$value[i]))
-               }
-               #tooltip=
-          ),
+      append(
+        list(
+            list(
+                 name=group,
+                 type='scatter',
+                 data=foreach(i=1:nrow(wellData)) %do% {
+                   return(c(wellData$Time[i],wellData$value[i]))
+                 }
+            )),if(input$errorBars)
+        list(
           list(
                name=group,
                type='errorbar',
@@ -481,7 +481,7 @@ shinyServer(function(input,output) {
                  return(c(wellData$Time[i],c(wellData$value[i]-wellData$se[i],
                                              wellData$value[i]+wellData$se[i])))
                }
-          )
+          )) else NULL
       )
     }
     p$series(series)
