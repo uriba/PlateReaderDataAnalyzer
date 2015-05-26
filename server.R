@@ -17,7 +17,6 @@
 #display (interactive?) plate layout
 #support multiple plate layout styles/files
 #add links to download/use sample files
-#support error bars on interactive graphs.
 #accelerate by using reactive melted data and manipulate it.
 
 library(shiny)
@@ -446,7 +445,7 @@ shinyServer(function(input,output) {
     return(p)
   })
   
-  timeSeriesChart <- function(plotData,label,ylimits) {
+  seriesChart <- function(plotData,xlabel,ylabel,xlimits,ylimits) {
     p <- Highcharts$new()
     p$chart(zoomType="xy")
     p$exporting(enabled=T)
@@ -455,9 +454,8 @@ shinyServer(function(input,output) {
     if(is.null(WellsDesc()))
       colorNum <- length(unique(plotData$variable))
     p$colors(gg_color_hue(colorNum))
-    limits <- timeLimits()
-    p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
-    p$yAxis(title=list(text=label),floor=ylimits[1],ceiling=ylimits[2])
+    p$xAxis(title=list(text=xlabel),floor=xlimits[1],ceiling=xlimits[2])
+    p$yAxis(title=list(text=ylabel),floor=ylimits[1],ceiling=ylimits[2])
     splitted <- split(plotData,plotData$variable)
     series <- foreach(group = names(splitted),.combine=append) %do% {
       wellData <- splitted[[group]]
@@ -468,7 +466,7 @@ shinyServer(function(input,output) {
                  name=group,
                  type='scatter',
                  data=foreach(i=1:nrow(wellData)) %do% {
-                   return(c(wellData$Time[i],wellData$value[i]))
+                   return(c(wellData$val[i],wellData$value[i]))
                  }
             )),if(input$errorBars)
         list(
@@ -476,7 +474,7 @@ shinyServer(function(input,output) {
                name=group,
                type='errorbar',
                data=foreach(i=1:nrow(wellData)) %do% {
-                 return(c(wellData$Time[i],c(wellData$ymin[i],
+                 return(c(wellData$val[i],c(wellData$ymin[i],
                                              wellData$ymax[i])))
                }
           )) else NULL
@@ -489,7 +487,8 @@ shinyServer(function(input,output) {
   charts[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()    
-    return(timeSeriesChart(ggplotdata,"growth rate",c(-0.1)))
+    ggplotdata$val <- ggplotdata$Time
+    return(seriesChart(ggplotdata,"time [h]","growth rate",timeLimits(),c(-0.1)))
   })
 
   plots[["growth rate vs. value"]] = reactive({
@@ -511,22 +510,7 @@ shinyServer(function(input,output) {
   charts[["growth rate vs. value"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()
-    p <- hPlot(x='val',y='value', data=ggplotdata, group='variable',type='scatter')
-    p$chart(zoomType="xy")
-    p$exporting(enabled=T)
-    p$legend(layout='vertical',align="right",verticalAlign='top')
-    colorNum <- length(WellsDesc())
-    if(is.null(WellsDesc()))
-      colorNum <- length(unique(ggplotdata$variable))
-    p$colors(gg_color_hue(colorNum))
-    p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
-    p$xAxis(title=list(text=paste0("log ",input$label)))
-    p$yAxis(title=list(text="growth rate"),floor=-0.1)
- 
-    #if(input$errorBars) {
-    #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
-    #}
-    return(p)
+    return(seriesChart(ggplotdata,paste0("log ",input$label),"growth rate",NULL,c(-0.1)))
   })
 
 
@@ -549,7 +533,8 @@ shinyServer(function(input,output) {
   charts[["doubling time vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- dtRegression()
-    return(timeSeriesChart(ggplotdata,"doubling time [min]",c(-10,as.numeric(input$maxdtime))))
+    ggplotdata$val <- ggplotdata$Time
+    return(seriesChart(ggplotdata,"time [h]","doubling time [min]",timeLimits(),c(-10,as.numeric(input$maxdtime))))
   })
 
   plots[["doubling time vs. value"]] = reactive({
@@ -572,23 +557,6 @@ shinyServer(function(input,output) {
   charts[["doubling time vs. value"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- dtRegression()
-
-    p <- hPlot(x='val',y='value', data=ggplotdata, group='variable',type='scatter')
-    p$chart(zoomType="xy")
-    p$exporting(enabled=T)
-    p$legend(layout='vertical',align="right",verticalAlign='top')
-    colorNum <- length(WellsDesc())
-    if(is.null(WellsDesc()))
-      colorNum <- length(unique(ggplotdata$variable))
-    p$colors(gg_color_hue(colorNum))
-    p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
-    p$xAxis(title=list(text=paste0("log ",input$label)))
-    p$yAxis(title=list(text="doubling time [min]"),floor=-10,ceiling=as.numeric(input$maxdtime))
-
-    #if(input$errorBars) {
-    #  p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
-    #}    
-      #scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
-    return(p)  
+    return(seriesChart(ggplotdata,paste0("log ",input$label),"doubling time [min]",NULL,c(-10,as.numeric(input$maxdtime))))
   })
 })
