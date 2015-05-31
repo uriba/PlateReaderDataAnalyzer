@@ -13,7 +13,6 @@
 ## fluorescence change / od (rate of production).
 #Set clear headlines for page according to analysis types
 #tooltip help
-#support plate layout in interactive graphs
 #display (interactive?) plate layout
 #support multiple plate layout styles/files
 #add links to download/use sample files
@@ -197,7 +196,7 @@ shinyServer(function(input,output) {
     regs.long$label <- regs.long$variable
     wellsDesc <- WellsDesc()
     if(! is.null(wellsDesc)) {
-        regs.long$label = wellsDesc[regs.long$variable]
+        regs.long$label = wellsDesc[as.character(regs.long$variable)]
     }
     return(regs.long)
   })
@@ -275,38 +274,23 @@ shinyServer(function(input,output) {
       ylab(label))
   }
 
-  simpleChart <- function(label,data,wellsDesc) {
-    data <- data[is.finite(data$value),]
-    p <- hPlot(x='Time',y='value', data=data, group='variable',type='scatter')
-    p$chart(zoomType="xy")
-    p$exporting(enabled=T)
-    p$legend(layout='vertical',align="right",verticalAlign='top')
-    colorNum <- length(wellsDesc)
-    if(is.null(wellsDesc))
-      colorNum <- length(unique(data$variable))
-    p$colors(gg_color_hue(colorNum))
-    p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=8,symbol='circle')))
-    p$xAxis(title=list(text="time [h]"))
-    p$yAxis(title=list(text=label))
-    return(p)
-  }
-
   rawPlot <- function(label,plotData,wellsDesc) {
       ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
       ggplotdata$label <- ggplotdata$variable
       if(! is.null(wellsDesc)) {
-        ggplotdata$label = wellsDesc[ggplotdata$variable]
+        ggplotdata$label <- wellsDesc[as.character(ggplotdata$variable)]
       }
       return(simplePlot(label,ggplotdata))
   }
 
   rawChart <- function(label,plotData,wellsDesc) {
       ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
+      ggplotdata$val <- ggplotdata$Time
       ggplotdata$label <- ggplotdata$variable
       if(! is.null(wellsDesc)) {
-        ggplotdata$label = wellsDesc[ggplotdata$variable]
+        ggplotdata$label = wellsDesc[as.character(ggplotdata$variable)]
       }
-      return(simpleChart(label,ggplotdata,wellsDesc))
+      return(seriesChart(ggplotdata,"time [h]",label,NULL,NULL))
   }
 
    for (i in 1:max_plots) {
@@ -446,16 +430,25 @@ shinyServer(function(input,output) {
   })
   
   seriesChart <- function(plotData,xlabel,ylabel,xlimits,ylimits) {
+    plotData <- plotData[is.finite(plotData$value),]
+    plotData$variable <- as.character(plotData$variable)
+    plotData$label <- plotData$variable
+    wellsDesc <- WellsDesc()
+    if(! is.null(wellsDesc)) {
+      plotData$label <- wellsDesc[plotData$variable]
+      plotData[,"variable"] <- lapply(plotData[,"variable",drop=FALSE],function(x) {paste(x, wellsDesc[x],sep=" - ")})
+    }
+    groups = unique(plotData$label)
+    colorNum <- length(groups)
+
     p <- Highcharts$new()
     p$chart(zoomType="xy")
     p$exporting(enabled=T)
     p$legend(layout='vertical',align="right",verticalAlign='top')
-    colorNum <- length(WellsDesc())
-    if(is.null(WellsDesc()))
-      colorNum <- length(unique(plotData$variable))
-    p$colors(gg_color_hue(colorNum))
+    colors = gg_color_hue(colorNum)
     p$xAxis(title=list(text=xlabel),floor=xlimits[1],ceiling=xlimits[2])
     p$yAxis(title=list(text=ylabel),floor=ylimits[1],ceiling=ylimits[2])
+    p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=2,symbol='circle')))
     splitted <- split(plotData,plotData$variable)
     series <- foreach(group = names(splitted),.combine=append) %do% {
       wellData <- splitted[[group]]
@@ -465,6 +458,7 @@ shinyServer(function(input,output) {
             list(
                  name=group,
                  type='scatter',
+                 color=colors[groups == wellData$label[1]],
                  data=foreach(i=1:nrow(wellData)) %do% {
                    return(c(wellData$val[i],wellData$value[i]))
                  }
