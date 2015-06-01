@@ -63,9 +63,25 @@ shinyServer(function(input,output) {
     if (is.null(inFile))
       return(NULL)
     df <- read.xls(inFile$datapath,stringsAsFactors=FALSE,header=FALSE,colClasses="character")
-    rownames(df) <- df[,1]
-    colnames(df) <- df[1,]
-    df <- df[-1,-1]
+    if(df[2,1] == 'a' && df[1,2]=='1') {
+      print("explicit wells")
+      rownames(df) <- df[,1]
+      colnames(df) <- df[1,]
+      df <- df[-1,-1]
+    }
+    else {
+      datacols <- columns()
+      datarows <- rows()
+      if(length(colnames(df)) == length(datacols) || length(rownames(df)) == length(rows)) {
+        colnames(df) <- datacols
+        rownames(df) <- datarows
+      }
+      else {
+        df <- t(df)
+        colnames(df) <- datacols
+        rownames(df) <- datarows
+      }
+    }
     labels <- c()
     for(row in rownames(df)) {
       for(col in colnames(df)) { 
@@ -222,26 +238,34 @@ shinyServer(function(input,output) {
     choices = names(Data()),
     selected = 1)
   })
-  
-  output$rowSelect <- renderUI({
+
+  rows <- reactive({
     if(is.null(Data())) { return() }
     plotData <- Data()[[names(Data())[1]]]
-    rows <- levels(factor(substring(colnames(plotData)[-1],1,1)))
+    return(levels(factor(substring(colnames(plotData)[-1],1,1))))
+  })
+
+  columns <- reactive({
+    if(is.null(Data())) { return() }
+    plotData <- Data()[[names(Data())[1]]]
+    return(levels(factor(substring(colnames(plotData)[-1],2))))
+  })
+
+  output$rowSelect <- renderUI({
+    if(is.null(Data())) { return() }
     selectInput(
-    inputId = "row",
-    label = "Select row to display",
-    choices = rows,
-    selected = 1)
+      inputId = "row",
+      label = "Select row to display",
+      choices = rows(),
+      selected = 1)
   })
   
   output$columnSelect <- renderUI({
     if(is.null(Data())) { return() }
-    plotData <- Data()[[names(Data())[1]]]
-    columns <- levels(factor(substring(colnames(plotData)[-1],2)))
     selectInput(
       inputId = "column",
       label = "Select column to display",
-      choices = columns,
+      choices = columns(),
       selected = 1)
   })
   
