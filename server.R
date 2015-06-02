@@ -63,7 +63,7 @@ shinyServer(function(input,output) {
     if (is.null(inFile))
       return(NULL)
     df <- read.xls(inFile$datapath,stringsAsFactors=FALSE,header=FALSE,colClasses="character")
-    if(df[2,1] == 'a' && df[1,2]=='1') {
+    if(df[2,1] == 'A' && df[1,2]=='1') {
       print("explicit wells")
       rownames(df) <- df[,1]
       colnames(df) <- df[1,]
@@ -165,6 +165,27 @@ shinyServer(function(input,output) {
   })
   
   rollingWindowRegression <- reactive({
+    regs <- wideRollingWindowRegression() 
+    std_errs = grep("std_err$",colnames(regs),value=TRUE)
+    vals = grep("vals$",colnames(regs),value=TRUE)
+    
+    regs.long <- melt(regs,id.vars=c(std_errs,vals,"Time"))# Reformat the data to be appropriate for multi line plot
+    regs.long[,c('se','val')]=1 #assign standard error and value of measurement where regression was taken
+    for (col in wells()) {
+      regs.long[which(regs.long$variable==col),'se']=regs.long[which(regs.long$variable==col),paste0(col,".std_err")]
+      regs.long[which(regs.long$variable==col),'val']=regs.long[which(regs.long$variable==col),paste0(col,".vals")]
+    }
+    regs.long$ymax <- regs.long$value+regs.long$se
+    regs.long$ymin <- regs.long$value-regs.long$se
+    regs.long$label <- regs.long$variable
+    wellsDesc <- WellsDesc()
+    if(! is.null(wellsDesc)) {
+        regs.long$label = wellsDesc[as.character(regs.long$variable)]
+    }
+    return(regs.long)
+  })
+
+  wideRollingWindowRegression <- reactive({
     reg <- function(window) {
       cols <- colnames(window)
       cols <- cols[cols!="Time"]
@@ -197,25 +218,8 @@ shinyServer(function(input,output) {
     regs <- as.data.frame(regs,stringsAsFactors = FALSE)
     regs[,"Time"] <- as.numeric(head(wellsData$Time,length(regs[,1])))
     regs[] = lapply(regs,as.numeric)
-    
-    std_errs = grep("std_err$",colnames(regs),value=TRUE)
-    vals = grep("vals$",colnames(regs),value=TRUE)
-    
-    regs.long <- melt(regs,id.vars=c(std_errs,vals,"Time"))# Reformat the data to be appropriate for multi line plot
-    regs.long[,c('se','val')]=1 #assign standard error and value of measurement where regression was taken
-    for (col in wells()) {
-      regs.long[which(regs.long$variable==col),'se']=regs.long[which(regs.long$variable==col),paste0(col,".std_err")]
-      regs.long[which(regs.long$variable==col),'val']=regs.long[which(regs.long$variable==col),paste0(col,".vals")]
-    }
-    regs.long$ymax <- regs.long$value+regs.long$se
-    regs.long$ymin <- regs.long$value-regs.long$se
-    regs.long$label <- regs.long$variable
-    wellsDesc <- WellsDesc()
-    if(! is.null(wellsDesc)) {
-        regs.long$label = wellsDesc[as.character(regs.long$variable)]
-    }
-    return(regs.long)
-  })
+    return(regs)
+   })
 
   dtRegression <- reactive({
     plotData <- rollingWindowRegression()
@@ -280,9 +284,14 @@ shinyServer(function(input,output) {
     # for each label - create a plotOutput object with the appropriate name:
     plots_list <- lapply(1:plotsNum,function(i){
                          plotstylename <- paste0("plotstyle",i)
-                         plot = plotOutput(paste0("plot",i))
-                         if(plotstylename %in% names(input) && input[[plotstylename]] == "interactive") {
+                         if(is.null(input[[plotstylename]]) || input[[plotstylename]] == "standard") {
+                             plot = plotOutput(paste0("plot",i))
+                         }
+                         else if(input[[plotstylename]] == "interactive") {
                              plot = showOutput(paste0("chart",i),"highcharts")
+                         }
+                         else if(input[[plotstylename]] == "table") {
+                             plot = dataTableOutput(paste0("table",i))
                            }
       tagList(uiOutput(plotstylename), plot)
     })
@@ -324,8 +333,8 @@ shinyServer(function(input,output) {
       output[[plotstylename]] <- renderUI({
         selectInput(
                 inputId = plotstylename,
-                label = "Graph display",
-                choices = c("standard","interactive"),
+                label = "Display",
+                choices = c("standard","interactive","table"),
                 selected = input[[plotstylename]])})
      })
    }
@@ -347,6 +356,7 @@ shinyServer(function(input,output) {
           return(plots[[input$grPlots[my_i]]]())
         }
       })
+
       output[[paste0("chart",my_i)]] <- renderChart({
         if(is.null(wells())) { return() }
         if(input$analysisType == "Plate overview") {
@@ -362,6 +372,19 @@ shinyServer(function(input,output) {
           p <- charts[[input$grPlots[my_i]]]()
           p$set(dom=paste0("chart",my_i))
           return(p)
+        }
+      })
+
+      output[[paste0("table",my_i)]] <- renderDataTable({
+        if(is.null(wells())) { return() }
+        if(input$analysisType == "Plate overview") {
+          if(my_i>length(names(Data()))) {return ()}
+          label <- names(Data())[my_i]
+          return(Data()[[label]][,c("Time",wells())])   
+        }
+        else if(input$analysisType =="Growth rate analysis") {
+          if(my_i>length(input$grPlots)) {return ()}
+          return(tables[[input$grPlots[my_i]]]())
         }
       })
     })  
@@ -395,6 +418,7 @@ shinyServer(function(input,output) {
   
   plots <- list()
   charts <- list()
+  tables <- list()
 
   plots[["raw"]] <- reactive({
     if(is.null(wells())) { return() }
@@ -408,6 +432,13 @@ shinyServer(function(input,output) {
       label <- input$label
       plotData <- Data()[[label]]
       return(rawChart(label,plotData[,c("Time",wells())],WellsDesc()))
+  })
+
+  tables[["raw"]] <- reactive({
+    if(is.null(wells())) { return() }
+      label <- input$label
+      plotData <- Data()[[label]]
+      return(plotData[,c("Time",wells())])
   })
 
   plots[["background subtracted"]] = reactive({
@@ -425,6 +456,12 @@ shinyServer(function(input,output) {
     return(p)
   })
 
+  tables[["background subtracted"]] = reactive({
+    if(is.null(wells())) { return() }
+    wellsData <- backgroundSubtracted()
+    return(wellsData)
+  })
+
   plots[["background subtracted log"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()
@@ -438,6 +475,13 @@ shinyServer(function(input,output) {
     limits <- timeLimits()
     p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
     return(p)
+  })
+
+  tables[["background subtracted log"]] = reactive({
+    if(is.null(wells())) { return() }
+    wellsData <- backgroundSubtractedLog()
+    is.na(wellsData) <- do.call(cbind,lapply(wellsData,is.infinite))
+    return(wellsData)
   })
 
   plots[["growth rate vs. time"]] = reactive({
@@ -509,6 +553,11 @@ shinyServer(function(input,output) {
     return(seriesChart(ggplotdata,"time [h]","growth rate",timeLimits(),c(-0.1)))
   })
 
+  tables[["growth rate vs. time"]] = reactive({
+    if(is.null(wells())) { return() }
+    return(wideRollingWindowRegression())
+  })
+  
   plots[["growth rate vs. value"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()
