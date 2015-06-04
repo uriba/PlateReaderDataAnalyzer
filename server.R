@@ -221,6 +221,13 @@ shinyServer(function(input,output) {
     return(regs)
    })
 
+  wideDTRegression <- reactive({
+    plotData <- wideRollingWindowRegression()
+    plotData[,c(grep("vals",colnames(plotData)))] <- lapply(plotData[,c(grep("vals",colnames(plotData)))],exp)
+    plotData[,wells()] <- lapply(plotData[,wells()],grToDt)
+    return (plotData)
+  })
+
   dtRegression <- reactive({
     plotData <- rollingWindowRegression()
     plotData[,c('value','ymax','ymin')] <- lapply(plotData[,c('value','ymax','ymin')],grToDt)
@@ -555,7 +562,13 @@ shinyServer(function(input,output) {
 
   tables[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
-    return(wideRollingWindowRegression())
+    data <- wideRollingWindowRegression()
+    data <- data[,-grep("vals",colnames(data))]
+    if(!input$errorBars) {
+      data <- data[,-grep("std_err",colnames(data))]
+    }
+    return(data)
+    #hierarchy columns and set time.
   })
   
   plots[["growth rate vs. value"]] = reactive({
@@ -580,7 +593,18 @@ shinyServer(function(input,output) {
     return(seriesChart(ggplotdata,paste0("log ",input$label),"growth rate",NULL,c(-0.1)))
   })
 
-
+  tables[["growth rate vs. value"]] = reactive({
+    #make hierarchy columns
+    if(is.null(wells())) { return() }
+    data <- wideRollingWindowRegression()
+    if(!input$errorBars) {
+      data <- data[,-grep("std_err",colnames(data))]
+    }
+    data$Time <- NULL
+    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
+    return(data)
+  })
+  
   grToDt <- function(x) {return(log(2)*60/x)}
   
   plots[["doubling time vs. time"]] = reactive({
@@ -602,6 +626,17 @@ shinyServer(function(input,output) {
     ggplotdata <- dtRegression()
     ggplotdata$val <- ggplotdata$Time
     return(seriesChart(ggplotdata,"time [h]","doubling time [min]",timeLimits(),c(-10,as.numeric(input$maxdtime))))
+  })
+
+  tables[["doubling time vs. time"]] = reactive({
+    #convert errorbars and make hierarchy columns
+    if(is.null(wells())) { return() }
+    data <- wideDTRegression()
+    data <- data[,-grep("vals",colnames(data))]
+    if(!input$errorBars) {
+      data <- data[,-grep("std_err",colnames(data))]
+    }
+    return(data)
   })
 
   plots[["doubling time vs. value"]] = reactive({
@@ -626,4 +661,16 @@ shinyServer(function(input,output) {
     ggplotdata <- dtRegression()
     return(seriesChart(ggplotdata,paste0("log ",input$label),"doubling time [min]",NULL,c(-10,as.numeric(input$maxdtime))))
   })
+
+  tables[["doubling time vs. value"]] = reactive({
+    #convert errorbars and make hierarchy columns
+    if(is.null(wells())) { return() }
+    data <- wideDTRegression()
+    data$Time <- NULL
+    if(!input$errorBars) {
+      data <- data[,-grep("std_err",colnames(data))]
+    }
+    return(data)
+  })
+
 })
