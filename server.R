@@ -567,8 +567,10 @@ shinyServer(function(input,output) {
     if(!input$errorBars) {
       data <- data[,-grep("std_err",colnames(data))]
     }
+    cols <- colnames(data)
+    data <- data[c("Time",cols[cols != "Time"])]
     return(data)
-    #hierarchy columns and set time.
+    #hierarchy columns.
   })
   
   plots[["growth rate vs. value"]] = reactive({
@@ -636,6 +638,8 @@ shinyServer(function(input,output) {
     if(!input$errorBars) {
       data <- data[,-grep("std_err",colnames(data))]
     }
+    cols <- colnames(data)
+    data <- data[c("Time",cols[cols != "Time"])]
     return(data)
   })
 
