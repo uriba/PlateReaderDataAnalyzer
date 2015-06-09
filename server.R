@@ -224,7 +224,14 @@ shinyServer(function(input,output) {
   wideDTRegression <- reactive({
     plotData <- wideRollingWindowRegression()
     plotData[,c(grep("vals",colnames(plotData)))] <- lapply(plotData[,c(grep("vals",colnames(plotData)))],exp)
-    plotData[,wells()] <- lapply(plotData[,wells()],grToDt)
+    for(well in wells()) {
+      stderr <- paste0(well,'.std_err')
+      dts <- as.numeric(lapply(plotData[,well],grToDt))
+      maxs <- as.numeric(lapply(as.numeric(plotData[,well])+as.numeric(plotData[,stderr]),grToDt))-dts
+      mins <- dts - as.numeric(lapply(plotData[,well]-plotData[,stderr],grToDt))
+      plotData[,well] <- dts
+      plotData[,stderr] <- abs(maxs+mins)/2
+    }
     return (plotData)
   })
 
@@ -631,7 +638,7 @@ shinyServer(function(input,output) {
   })
 
   tables[["doubling time vs. time"]] = reactive({
-    #convert errorbars and make hierarchy columns
+    #make hierarchy columns
     if(is.null(wells())) { return() }
     data <- wideDTRegression()
     data <- data[,-grep("vals",colnames(data))]
@@ -667,7 +674,7 @@ shinyServer(function(input,output) {
   })
 
   tables[["doubling time vs. value"]] = reactive({
-    #convert errorbars and make hierarchy columns
+    #make hierarchy columns
     if(is.null(wells())) { return() }
     data <- wideDTRegression()
     data$Time <- NULL
