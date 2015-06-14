@@ -1,7 +1,6 @@
 #ToDo:
 #Integrate plot.ly as choice for output for export (given username and authentication key).
 #find way to use multiple columns in plot.ly legend.
-#allow selection of graph display on top of every graph (simple, interactive, plot.ly, table)
 #Add update plots button?
 #Color code input types + collapsable for cleaner UI.
 #Add help and documentation to web page
@@ -17,6 +16,10 @@
 #support multiple plate layout styles/files
 #add links to download/use sample files
 #accelerate by using reactive melted data and manipulate it.
+#add links to download table data
+#make hierarchial column titles in tables
+#add labels to columns in tables
+#check hierarchial column titles when labels are not present.
 
 library(shiny)
 library(gdata)
@@ -26,6 +29,7 @@ library(zoo)
 library(plotly)
 library(rCharts)
 library(foreach)
+library(DT)
 
 source('tecanProcess.R')
 
@@ -305,7 +309,7 @@ shinyServer(function(input,output) {
                              plot = showOutput(paste0("chart",i),"highcharts")
                          }
                          else if(input[[plotstylename]] == "table") {
-                             plot = dataTableOutput(paste0("table",i))
+                             plot = DT::dataTableOutput(paste0("table",i))
                            }
       tagList(uiOutput(plotstylename), plot)
     })
@@ -389,12 +393,33 @@ shinyServer(function(input,output) {
         }
       })
 
-      output[[paste0("table",my_i)]] <- renderDataTable({
+      output[[paste0("table",my_i)]] <- DT::renderDataTable({
         if(is.null(wells())) { return() }
         if(input$analysisType == "Plate overview") {
           if(my_i>length(names(Data()))) {return ()}
           label <- names(Data())[my_i]
-          return(Data()[[label]][,c("Time",wells())])   
+          data <- Data()[[label]][,c("Time",wells())]
+          sketch <- NULL
+          if(input$analysisType == "Plate overview") {
+            wellsDesc <- WellsDesc()
+            labels <- unique(wellsDesc)
+            cols <- c()
+            for(l in labels) {
+              cols <- append(cols,names(wellsDesc[wellsDesc == l]))
+            }
+            sketch <- htmltools::withTags(table(class='display',
+                                                thead(
+                                                     tr(
+                                                        th(rowspan=2,"Time"),
+                                                        lapply(labels,function(x) {
+                                                               return(th(x,colspan=length(wellsDesc[wellsDesc == x])))
+                                                        })
+                                                     ),
+                                                     tr( lapply(cols,th))
+                                                )))
+          }
+          d <- datatable(data, container = sketch,rownames = FALSE)
+          return(d)
         }
         else if(input$analysisType =="Growth rate analysis") {
           if(my_i>length(input$grPlots)) {return ()}

@@ -103,6 +103,7 @@ getLables <- function(filepath) {
 }
 
 readMultiFiles <- function(filepath,platesnum) {
+  Sys.setlocale('LC_ALL','C')
   retval <- c()
   for(i in 1:platesnum) {
     print("getting labels from:")
@@ -161,6 +162,7 @@ readMultiFiles <- function(filepath,platesnum) {
 }
 
 readSingleFile <- function(filepath) {
+  Sys.setlocale('LC_ALL','C')
   df <- read.xls(filepath,stringsAsFactors=FALSE,header=FALSE)
   fileSource <- df[1,1]
   print(fileSource)
