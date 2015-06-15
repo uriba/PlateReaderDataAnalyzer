@@ -17,7 +17,7 @@
 #add links to download/use sample files
 #accelerate by using reactive melted data and manipulate it.
 #add links to download table data
-#add labels to columns in tables for growth rate analysis
+#add labels to columns in tables for growth rate analysis+extended hierarchy
 
 library(shiny)
 library(gdata)
@@ -458,6 +458,19 @@ shinyServer(function(input,output) {
     print(res)
     tags$iframe(src=res$response$url,frameborder="0",height=400,width=650)
   })
+
+  simpleTable <- function(data) {
+    cols <- colnames(data)
+    data <- data[c("Time",cols[cols != "Time"])]
+    wellsDesc <- WellsDesc()
+    if(!is.null(wellsDesc)) {
+      sketch <- simpleTableSketch(data)
+      return(datatable(data,container = sketch,rownames=FALSE))
+    } else {
+      return(datatable(data,rownames=FALSE))
+    }
+  }
+
   
   plots <- list()
   charts <- list()
@@ -482,13 +495,7 @@ shinyServer(function(input,output) {
       label <- input$label
       data <- Data()[[label]]
       data <- data[,c("Time",wells())]
-      wellsDesc <- WellsDesc()
-      if(!is.null(wellsDesc)) {
-        sketch <- simpleTableSketch(data)
-        return(datatable(data,container = sketch,rownames=FALSE))
-      } else {
-        return(datatable(data,rownames=FALSE))
-      }
+      return(simpleTable(data))
   })
 
   plots[["background subtracted"]] = reactive({
@@ -509,15 +516,7 @@ shinyServer(function(input,output) {
   tables[["background subtracted"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtracted()
-    cols <- colnames(wellsData)
-    wellsData <- wellsData[c("Time",cols[cols != "Time"])]
-    wellsDesc <- WellsDesc()
-    if(!is.null(wellsDesc)) {
-      sketch <- simpleTableSketch(wellsData)
-      return(datatable(wellsData,container = sketch,rownames=FALSE))
-    } else {
-      return(datatable(wellsData,rownames=FALSE))
-    }
+    return(simpleTable(wellsData))
   })
 
   plots[["background subtracted log"]] = reactive({
@@ -539,15 +538,7 @@ shinyServer(function(input,output) {
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()
     is.na(wellsData) <- do.call(cbind,lapply(wellsData,is.infinite))
-    cols <- colnames(wellsData)
-    wellsData <- wellsData[c("Time",cols[cols != "Time"])]
-    wellsDesc <- WellsDesc()
-    if(!is.null(wellsDesc)) {
-      sketch <- simpleTableSketch(wellsData)
-      return(datatable(wellsData,container = sketch,rownames=FALSE))
-    } else {
-      return(datatable(wellsData,rownames=FALSE))
-    }
+    return(simpleTable(wellsData))
   })
 
   plots[["growth rate vs. time"]] = reactive({
