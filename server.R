@@ -17,9 +17,7 @@
 #add links to download/use sample files
 #accelerate by using reactive melted data and manipulate it.
 #add links to download table data
-#make hierarchial column titles in tables
-#add labels to columns in tables
-#check hierarchial column titles when labels are not present.
+#add labels to columns in tables for growth rate analysis
 
 library(shiny)
 library(gdata)
@@ -400,8 +398,9 @@ shinyServer(function(input,output) {
           label <- names(Data())[my_i]
           data <- Data()[[label]][,c("Time",wells())]
           sketch <- NULL
-          if(input$analysisType == "Plate overview") {
-            wellsDesc <- WellsDesc()
+          wellsDesc <- WellsDesc()
+          if(!is.null(wellsDesc)) {
+            wellsDesc <- wellsDesc[wells()]
             labels <- unique(wellsDesc)
             cols <- c()
             for(l in labels) {
@@ -417,8 +416,10 @@ shinyServer(function(input,output) {
                                                      ),
                                                      tr( lapply(cols,th))
                                                 )))
-          }
-          d <- datatable(data, container = sketch,rownames = FALSE)
+            d <- datatable(data, container = sketch,rownames = FALSE)
+            } else {
+            d <- datatable(data,rownames = FALSE)
+            }
           return(d)
         }
         else if(input$analysisType =="Growth rate analysis") {
