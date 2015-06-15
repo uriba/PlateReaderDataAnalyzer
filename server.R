@@ -355,6 +355,26 @@ shinyServer(function(input,output) {
      })
    }
 
+  simpleTableSketch <- function(data) {
+        wellsDesc <- WellsDesc()
+        wellsDesc <- wellsDesc[wells()]
+        labels <- unique(wellsDesc)
+        cols <- c()
+        for(l in labels) {
+          cols <- append(cols,names(wellsDesc[wellsDesc == l]))
+        }
+        sketch <- htmltools::withTags(table(class='display',
+                                            thead(
+                                                 tr(
+                                                    th(rowspan=2,"Time"),
+                                                    lapply(labels,function(x) {
+                                                           return(th(x,colspan=length(wellsDesc[wellsDesc == x])))
+                                                    })
+                                                 ),
+                                                 tr( lapply(cols,th))
+                                            )))
+        return(sketch)
+   }
  
   for (i in 1:max_plots) { # generate plots for all the labels (up to 10 labels are allowed)
     local({
@@ -397,29 +417,12 @@ shinyServer(function(input,output) {
           if(my_i>length(names(Data()))) {return ()}
           label <- names(Data())[my_i]
           data <- Data()[[label]][,c("Time",wells())]
-          sketch <- NULL
-          wellsDesc <- WellsDesc()
-          if(!is.null(wellsDesc)) {
-            wellsDesc <- wellsDesc[wells()]
-            labels <- unique(wellsDesc)
-            cols <- c()
-            for(l in labels) {
-              cols <- append(cols,names(wellsDesc[wellsDesc == l]))
-            }
-            sketch <- htmltools::withTags(table(class='display',
-                                                thead(
-                                                     tr(
-                                                        th(rowspan=2,"Time"),
-                                                        lapply(labels,function(x) {
-                                                               return(th(x,colspan=length(wellsDesc[wellsDesc == x])))
-                                                        })
-                                                     ),
-                                                     tr( lapply(cols,th))
-                                                )))
+          if(!is.null(WellsDesc())) {
+            sketch <- simpleTableSketch(data)
             d <- datatable(data, container = sketch,rownames = FALSE)
-            } else {
+          } else {
             d <- datatable(data,rownames = FALSE)
-            }
+          }
           return(d)
         }
         else if(input$analysisType =="Growth rate analysis") {
@@ -477,8 +480,15 @@ shinyServer(function(input,output) {
   tables[["raw"]] <- reactive({
     if(is.null(wells())) { return() }
       label <- input$label
-      plotData <- Data()[[label]]
-      return(plotData[,c("Time",wells())])
+      data <- Data()[[label]]
+      data <- data[,c("Time",wells())]
+      wellsDesc <- WellsDesc()
+      if(!is.null(wellsDesc)) {
+        sketch <- simpleTableSketch(data)
+        return(datatable(data,container = sketch,rownames=FALSE))
+      } else {
+        return(datatable(data,rownames=FALSE))
+      }
   })
 
   plots[["background subtracted"]] = reactive({
@@ -499,7 +509,15 @@ shinyServer(function(input,output) {
   tables[["background subtracted"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtracted()
-    return(wellsData)
+    cols <- colnames(wellsData)
+    wellsData <- wellsData[c("Time",cols[cols != "Time"])]
+    wellsDesc <- WellsDesc()
+    if(!is.null(wellsDesc)) {
+      sketch <- simpleTableSketch(wellsData)
+      return(datatable(wellsData,container = sketch,rownames=FALSE))
+    } else {
+      return(datatable(wellsData,rownames=FALSE))
+    }
   })
 
   plots[["background subtracted log"]] = reactive({
@@ -521,7 +539,15 @@ shinyServer(function(input,output) {
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()
     is.na(wellsData) <- do.call(cbind,lapply(wellsData,is.infinite))
-    return(wellsData)
+    cols <- colnames(wellsData)
+    wellsData <- wellsData[c("Time",cols[cols != "Time"])]
+    wellsDesc <- WellsDesc()
+    if(!is.null(wellsDesc)) {
+      sketch <- simpleTableSketch(wellsData)
+      return(datatable(wellsData,container = sketch,rownames=FALSE))
+    } else {
+      return(datatable(wellsData,rownames=FALSE))
+    }
   })
 
   plots[["growth rate vs. time"]] = reactive({
