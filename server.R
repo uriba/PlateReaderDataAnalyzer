@@ -17,7 +17,8 @@
 #add links to download/use sample files
 #accelerate by using reactive melted data and manipulate it.
 #add links to download table data
-#add labels to columns in tables for growth rate analysis+extended hierarchy
+#add table headers
+#reduce size of table number presentation
 
 library(shiny)
 library(gdata)
@@ -356,25 +357,62 @@ shinyServer(function(input,output) {
    }
 
   simpleTableSketch <- function(data) {
-        wellsDesc <- WellsDesc()
-        wellsDesc <- wellsDesc[wells()]
-        labels <- unique(wellsDesc)
-        cols <- c()
-        for(l in labels) {
-          cols <- append(cols,names(wellsDesc[wellsDesc == l]))
-        }
-        sketch <- htmltools::withTags(table(class='display',
-                                            thead(
-                                                 tr(
-                                                    th(rowspan=2,"Time"),
-                                                    lapply(labels,function(x) {
-                                                           return(th(x,colspan=length(wellsDesc[wellsDesc == x])))
-                                                    })
-                                                 ),
-                                                 tr( lapply(cols,th))
-                                            )))
-        return(sketch)
+    wellsDesc <- WellsDesc()
+    wellsDesc <- wellsDesc[wells()]
+    labels <- unique(wellsDesc)
+    cols <- c()
+    for(l in labels) {
+      cols <- append(cols,names(wellsDesc[wellsDesc == l]))
+    }
+    sketch <- htmltools::withTags(table(class='display',
+                                        thead(
+                                             tr(
+                                                th(rowspan=2,"Time"),
+                                                lapply(labels,function(x) {
+                                                       return(th(x,colspan=length(wellsDesc[wellsDesc == x])))
+                                                })
+                                             ),
+                                             tr( lapply(cols,th))
+                                        )))
+    return(sketch)
    }
+
+  structuredTableSketch <- function(data,label,stat) {
+    cols <- wells()
+    wellsDesc <- WellsDesc()
+    noLabels <- is.null(wellsDesc)
+    if(!noLabels) {
+      wellsDesc <- wellsDesc[wells()]
+      labels <- unique(wellsDesc)
+      cols <- c()
+      for(l in labels) {
+        cols <- append(cols,names(wellsDesc[wellsDesc == l]))
+      }
+    }
+    trows <- if(!noLabels) {
+      htmltools::withTags(
+                    list(
+                   tr(
+                      th(rowspan=3,"Time"),
+                      lapply(labels,function(x) {
+                             return(th(x,colspan=3*length(wellsDesc[wellsDesc == x])))
+                      })
+                   ),
+                   tr( lapply(cols,function(x) {
+                              return(th(x,colspan=3))
+                      }))))}
+             else {
+               htmltools::withTags(tr(
+                       th(rowspan=2,"Time"),
+                       lapply(cols,function(x) {return(th(x,colspan=3))}
+             )))}
+    ls <- rep(c(label,stat,'StdErr'),length(cols))
+    tlast <- htmltools::withTags(lapply(ls,th))
+    sketch <- htmltools::withTags(table(class='display',
+                                        thead(trows,tr(lapply(ls,th)))
+                                        ))
+    return(sketch)
+  }
  
   for (i in 1:max_plots) { # generate plots for all the labels (up to 10 labels are allowed)
     local({
@@ -471,6 +509,54 @@ shinyServer(function(input,output) {
     }
   }
 
+  seriesChart <- function(plotData,xlabel,ylabel,xlimits,ylimits) {
+    plotData <- plotData[is.finite(plotData$value),]
+    plotData$variable <- as.character(plotData$variable)
+    plotData$label <- plotData$variable
+    wellsDesc <- WellsDesc()
+    if(! is.null(wellsDesc)) {
+      plotData$label <- wellsDesc[plotData$variable]
+      plotData[,"variable"] <- lapply(plotData[,"variable",drop=FALSE],function(x) {paste(x, wellsDesc[x],sep=" - ")})
+    }
+    groups = unique(plotData$label)
+    colorNum <- length(groups)
+
+    p <- Highcharts$new()
+    p$chart(zoomType="xy")
+    p$exporting(enabled=T)
+    p$legend(layout='vertical',align="right",verticalAlign='top')
+    colors = gg_color_hue(colorNum)
+    p$xAxis(title=list(text=xlabel),floor=xlimits[1],ceiling=xlimits[2])
+    p$yAxis(title=list(text=ylabel),floor=ylimits[1],ceiling=ylimits[2])
+    p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=2,symbol='circle')))
+    splitted <- split(plotData,plotData$variable)
+    series <- foreach(group = names(splitted),.combine=append) %do% {
+      wellData <- splitted[[group]]
+      if(nrow(wellData) == 0) return(NULL)
+      append(
+        list(
+            list(
+                 name=group,
+                 type='scatter',
+                 color=colors[groups == wellData$label[1]],
+                 data=foreach(i=1:nrow(wellData)) %do% {
+                   return(c(wellData$val[i],wellData$value[i]))
+                 }
+            )),if(input$errorBars)
+        list(
+          list(
+               name=group,
+               type='errorbar',
+               data=foreach(i=1:nrow(wellData)) %do% {
+                 return(c(wellData$val[i],c(wellData$ymin[i],
+                                             wellData$ymax[i])))
+               }
+          )) else NULL
+      )
+    }
+    p$series(series)
+    return(p)
+  }
   
   plots <- list()
   charts <- list()
@@ -554,55 +640,6 @@ shinyServer(function(input,output) {
     return(p)
   })
   
-  seriesChart <- function(plotData,xlabel,ylabel,xlimits,ylimits) {
-    plotData <- plotData[is.finite(plotData$value),]
-    plotData$variable <- as.character(plotData$variable)
-    plotData$label <- plotData$variable
-    wellsDesc <- WellsDesc()
-    if(! is.null(wellsDesc)) {
-      plotData$label <- wellsDesc[plotData$variable]
-      plotData[,"variable"] <- lapply(plotData[,"variable",drop=FALSE],function(x) {paste(x, wellsDesc[x],sep=" - ")})
-    }
-    groups = unique(plotData$label)
-    colorNum <- length(groups)
-
-    p <- Highcharts$new()
-    p$chart(zoomType="xy")
-    p$exporting(enabled=T)
-    p$legend(layout='vertical',align="right",verticalAlign='top')
-    colors = gg_color_hue(colorNum)
-    p$xAxis(title=list(text=xlabel),floor=xlimits[1],ceiling=xlimits[2])
-    p$yAxis(title=list(text=ylabel),floor=ylimits[1],ceiling=ylimits[2])
-    p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=2,symbol='circle')))
-    splitted <- split(plotData,plotData$variable)
-    series <- foreach(group = names(splitted),.combine=append) %do% {
-      wellData <- splitted[[group]]
-      if(nrow(wellData) == 0) return(NULL)
-      append(
-        list(
-            list(
-                 name=group,
-                 type='scatter',
-                 color=colors[groups == wellData$label[1]],
-                 data=foreach(i=1:nrow(wellData)) %do% {
-                   return(c(wellData$val[i],wellData$value[i]))
-                 }
-            )),if(input$errorBars)
-        list(
-          list(
-               name=group,
-               type='errorbar',
-               data=foreach(i=1:nrow(wellData)) %do% {
-                 return(c(wellData$val[i],c(wellData$ymin[i],
-                                             wellData$ymax[i])))
-               }
-          )) else NULL
-      )
-    }
-    p$series(series)
-    return(p)
-  }
-
   charts[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()    
@@ -613,14 +650,13 @@ shinyServer(function(input,output) {
   tables[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     data <- wideRollingWindowRegression()
-    data <- data[,-grep("vals",colnames(data))]
-    if(!input$errorBars) {
-      data <- data[,-grep("std_err",colnames(data))]
-    }
+    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
     cols <- colnames(data)
     data <- data[c("Time",cols[cols != "Time"])]
-    return(data)
-    #hierarchy columns.
+    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
+    sketch <- structuredTableSketch(data,input$label,'Growth')
+    return(datatable(data,container = sketch,rownames=FALSE))
+#make common function with growth rate vs. time
   })
   
   plots[["growth rate vs. value"]] = reactive({
@@ -646,15 +682,15 @@ shinyServer(function(input,output) {
   })
 
   tables[["growth rate vs. value"]] = reactive({
-    #make hierarchy columns
     if(is.null(wells())) { return() }
     data <- wideRollingWindowRegression()
-    if(!input$errorBars) {
-      data <- data[,-grep("std_err",colnames(data))]
-    }
-    data$Time <- NULL
+    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
+    cols <- colnames(data)
+    data <- data[c("Time",cols[cols != "Time"])]
     data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
-    return(data)
+    sketch <- structuredTableSketch(data,as.character(input$label),'Growth')
+    return(datatable(data,container = sketch,rownames=FALSE))
+#make common function with growth rate vs. time
   })
   
   grToDt <- function(x) {return(log(2)*60/x)}
@@ -681,16 +717,15 @@ shinyServer(function(input,output) {
   })
 
   tables[["doubling time vs. time"]] = reactive({
-    #make hierarchy columns
     if(is.null(wells())) { return() }
     data <- wideDTRegression()
-    data <- data[,-grep("vals",colnames(data))]
-    if(!input$errorBars) {
-      data <- data[,-grep("std_err",colnames(data))]
-    }
+    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
     cols <- colnames(data)
     data <- data[c("Time",cols[cols != "Time"])]
-    return(data)
+    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
+    sketch <- structuredTableSketch(data,input$label,'Doubling time')
+    return(datatable(data,container = sketch,rownames=FALSE))
+#make common function with growth rate vs. time
   })
 
   plots[["doubling time vs. value"]] = reactive({
@@ -717,14 +752,14 @@ shinyServer(function(input,output) {
   })
 
   tables[["doubling time vs. value"]] = reactive({
-    #make hierarchy columns
     if(is.null(wells())) { return() }
     data <- wideDTRegression()
-    data$Time <- NULL
-    if(!input$errorBars) {
-      data <- data[,-grep("std_err",colnames(data))]
-    }
-    return(data)
+    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
+    cols <- colnames(data)
+    data <- data[c("Time",cols[cols != "Time"])]
+    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
+    sketch <- structuredTableSketch(data,input$label,'Doubling time')
+    return(datatable(data,container = sketch,rownames=FALSE))
+#make common function with growth rate vs. time
   })
-
 })
