@@ -17,7 +17,6 @@
 #add links to download/use sample files
 #accelerate by using reactive melted data and manipulate it.
 #add links to download table data
-#add table headers
 #reduce size of table number presentation
 
 library(shiny)
@@ -455,11 +454,12 @@ shinyServer(function(input,output) {
           if(my_i>length(names(Data()))) {return ()}
           label <- names(Data())[my_i]
           data <- Data()[[label]][,c("Time",wells())]
+          caption <- paste0(label," values over time")
           if(!is.null(WellsDesc())) {
             sketch <- simpleTableSketch(data)
-            d <- datatable(data, container = sketch,rownames = FALSE)
+            d <- datatable(data, container = sketch,rownames = FALSE,caption = caption)
           } else {
-            d <- datatable(data,rownames = FALSE)
+            d <- datatable(data,rownames = FALSE,caption = caption)
           }
           return(d)
         }
@@ -497,15 +497,15 @@ shinyServer(function(input,output) {
     tags$iframe(src=res$response$url,frameborder="0",height=400,width=650)
   })
 
-  simpleTable <- function(data) {
+  simpleTable <- function(data,caption) {
     cols <- colnames(data)
     data <- data[c("Time",cols[cols != "Time"])]
     wellsDesc <- WellsDesc()
     if(!is.null(wellsDesc)) {
       sketch <- simpleTableSketch(data)
-      return(datatable(data,container = sketch,rownames=FALSE))
+      return(datatable(data,container = sketch,rownames=FALSE,caption = caption))
     } else {
-      return(datatable(data,rownames=FALSE))
+      return(datatable(data,rownames=FALSE,caption = caption))
     }
   }
 
@@ -581,7 +581,8 @@ shinyServer(function(input,output) {
       label <- input$label
       data <- Data()[[label]]
       data <- data[,c("Time",wells())]
-      return(simpleTable(data))
+      caption = paste0(label," values over time")
+      return(simpleTable(data,caption))
   })
 
   plots[["background subtracted"]] = reactive({
@@ -602,7 +603,9 @@ shinyServer(function(input,output) {
   tables[["background subtracted"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtracted()
-    return(simpleTable(wellsData))
+    caption <- paste0("Background subtracted ",input$label)
+    caption <- paste0(caption," over time")
+    return(simpleTable(wellsData,caption))
   })
 
   plots[["background subtracted log"]] = reactive({
@@ -624,7 +627,9 @@ shinyServer(function(input,output) {
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()
     is.na(wellsData) <- do.call(cbind,lapply(wellsData,is.infinite))
-    return(simpleTable(wellsData))
+    caption <- paste0("Background subtracted log ",input$label)
+    caption <- paste0(caption," over time")
+    return(simpleTable(wellsData,caption))
   })
 
   plots[["growth rate vs. time"]] = reactive({
@@ -647,7 +652,7 @@ shinyServer(function(input,output) {
     return(seriesChart(ggplotdata,"time [h]","growth rate",timeLimits(),c(-0.1)))
   })
 
-  tables[["growth rate vs. time"]] = reactive({
+  growthRateTable = reactive({
     if(is.null(wells())) { return() }
     data <- wideRollingWindowRegression()
     is.na(data) <- do.call(cbind,lapply(data,is.infinite))
@@ -655,10 +660,12 @@ shinyServer(function(input,output) {
     data <- data[c("Time",cols[cols != "Time"])]
     data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
     sketch <- structuredTableSketch(data,input$label,'Growth')
-    return(datatable(data,container = sketch,rownames=FALSE))
-#make common function with growth rate vs. time
+    caption <- paste0("Growth rate based on ",input$label)
+    return(datatable(data,container = sketch,rownames=FALSE,caption = caption))
   })
-  
+
+  tables[["growth rate vs. time"]] = growthRateTable
+
   plots[["growth rate vs. value"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()
@@ -681,17 +688,7 @@ shinyServer(function(input,output) {
     return(seriesChart(ggplotdata,paste0("log ",input$label),"growth rate",NULL,c(-0.1)))
   })
 
-  tables[["growth rate vs. value"]] = reactive({
-    if(is.null(wells())) { return() }
-    data <- wideRollingWindowRegression()
-    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
-    cols <- colnames(data)
-    data <- data[c("Time",cols[cols != "Time"])]
-    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
-    sketch <- structuredTableSketch(data,as.character(input$label),'Growth')
-    return(datatable(data,container = sketch,rownames=FALSE))
-#make common function with growth rate vs. time
-  })
+  tables[["growth rate vs. value"]] = growthRateTable
   
   grToDt <- function(x) {return(log(2)*60/x)}
   
@@ -716,7 +713,7 @@ shinyServer(function(input,output) {
     return(seriesChart(ggplotdata,"time [h]","doubling time [min]",timeLimits(),c(-10,as.numeric(input$maxdtime))))
   })
 
-  tables[["doubling time vs. time"]] = reactive({
+  doublingTimeTable = reactive({
     if(is.null(wells())) { return() }
     data <- wideDTRegression()
     is.na(data) <- do.call(cbind,lapply(data,is.infinite))
@@ -724,9 +721,11 @@ shinyServer(function(input,output) {
     data <- data[c("Time",cols[cols != "Time"])]
     data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
     sketch <- structuredTableSketch(data,input$label,'Doubling time')
-    return(datatable(data,container = sketch,rownames=FALSE))
-#make common function with growth rate vs. time
+    caption <- paste0("Doubling time [min] based on ",input$label)
+    return(datatable(data,container = sketch,rownames=FALSE,caption = caption))
   })
+
+  tables[["doubling time vs. time"]] = doublingTimeTable
 
   plots[["doubling time vs. value"]] = reactive({
     if(is.null(wells())) { return() }
@@ -751,15 +750,5 @@ shinyServer(function(input,output) {
     return(seriesChart(ggplotdata,paste0("log ",input$label),"doubling time [min]",NULL,c(-10,as.numeric(input$maxdtime))))
   })
 
-  tables[["doubling time vs. value"]] = reactive({
-    if(is.null(wells())) { return() }
-    data <- wideDTRegression()
-    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
-    cols <- colnames(data)
-    data <- data[c("Time",cols[cols != "Time"])]
-    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
-    sketch <- structuredTableSketch(data,input$label,'Doubling time')
-    return(datatable(data,container = sketch,rownames=FALSE))
-#make common function with growth rate vs. time
-  })
+  tables[["doubling time vs. value"]] = doublingTimeTable
 })
