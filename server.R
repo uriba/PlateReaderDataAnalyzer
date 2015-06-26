@@ -16,7 +16,6 @@
 #support multiple plate layout styles/files
 #add links to download/use sample files
 #accelerate by using reactive melted data and manipulate it.
-#add links to download table data
 #reduce size of table number presentation
 
 library(shiny)
@@ -150,7 +149,7 @@ shinyServer(function(input,output) {
       }
     }      
     wellsData[,"Time"] = labelData$Time
-    return(wellsData)
+    return(wellsData[,c("Time",wells())])
   })
   
   backgroundSubtractedLog <- reactive({
@@ -300,6 +299,7 @@ shinyServer(function(input,output) {
     # for each label - create a plotOutput object with the appropriate name:
     plots_list <- lapply(1:plotsNum,function(i){
                          plotstylename <- paste0("plotstyle",i)
+                         downloadButtonName <- paste0("download",i)
                          if(is.null(input[[plotstylename]]) || input[[plotstylename]] == "standard") {
                              plot = plotOutput(paste0("plot",i))
                          }
@@ -309,7 +309,7 @@ shinyServer(function(input,output) {
                          else if(input[[plotstylename]] == "table") {
                              plot = DT::dataTableOutput(paste0("table",i))
                            }
-      tagList(uiOutput(plotstylename), plot)
+      tagList(uiOutput(plotstylename),downloadButton(downloadButtonName,'Download data'),plot)
     })
     do.call(tagList,plots_list)    
   })
@@ -468,10 +468,38 @@ shinyServer(function(input,output) {
           return(tables[[input$grPlots[my_i]]]())
         }
       })
+
+      output[[paste0("download",my_i)]] <- downloadHandler(
+        filename = function() {paste0(caption(my_i),'.csv')},
+        content = function(file) {
+          if(input$analysisType == "Plate overview") {
+            if(my_i>length(names(Data()))) {return ()}
+            label <- names(Data())[my_i]
+            data <- Data()[[label]][,c("Time",wells())]
+          }
+          else if(input$analysisType =="Growth rate analysis") {
+            if(my_i>length(input$grPlots)) {return ()}
+            data <- dataframe[[input$grPlots[my_i]]]()
+          }
+          write.csv(data,file)
+        })
     })  
   }
 
- gg_color_hue <- function(n) {
+  caption <- function(i) {
+    filenames = c("raw" = 'raw',"background subtracted" = "background subtracted",
+                  "background subtracted log"= "background subtracted log",
+                  "growth rate vs. time" = "growth rate", "doubling time vs. time" = "doubling time",
+                  "growth rate vs. value" = "growth rate", "doubling time vs. value" = "doubling time"
+                  )
+    if(input$analysisType == "Plate overview") {
+      return(names(Data())[i])
+    } else if(input$analysisType =="Growth rate analysis") {
+      return(filenames[input$grPlots[i]])
+    }
+  }
+
+  gg_color_hue <- function(n) {
      hues = seq(15, 375, length=n+1)
        hcl(h=hues, l=65, c=100)[1:n]
  }
@@ -498,8 +526,6 @@ shinyServer(function(input,output) {
   })
 
   simpleTable <- function(data,caption) {
-    cols <- colnames(data)
-    data <- data[c("Time",cols[cols != "Time"])]
     wellsDesc <- WellsDesc()
     if(!is.null(wellsDesc)) {
       sketch <- simpleTableSketch(data)
@@ -561,28 +587,35 @@ shinyServer(function(input,output) {
   plots <- list()
   charts <- list()
   tables <- list()
+  dataframe <- list()
+
+  dataframe[["raw"]] <- reactive({
+    if(is.null(wells())) { return() }
+    label <- input$label
+    data <- Data()[[label]]
+    data <- data[,c("Time",wells())]
+  })
 
   plots[["raw"]] <- reactive({
     if(is.null(wells())) { return() }
-      label <- input$label
-      plotData <- Data()[[label]]    
-      return(rawPlot(label,plotData[,c("Time",wells())],WellsDesc()))
+    label <- input$label
+    plotData <- Data()[[label]]
+    return(rawPlot(label,plotData[,c("Time",wells())],WellsDesc()))
   })
 
   charts[["raw"]] <- reactive({
     if(is.null(wells())) { return() }
-      label <- input$label
-      plotData <- Data()[[label]]
-      return(rawChart(label,plotData[,c("Time",wells())],WellsDesc()))
+    return(rawChart(input$label,dataframe[["raw"]](),WellsDesc()))
   })
 
   tables[["raw"]] <- reactive({
+      caption = paste0(input$label," values over time")
+      return(simpleTable(dataframe[["raw"]](),caption))
+  })
+
+  dataframe[["background subtracted"]] <- reactive({
     if(is.null(wells())) { return() }
-      label <- input$label
-      data <- Data()[[label]]
-      data <- data[,c("Time",wells())]
-      caption = paste0(label," values over time")
-      return(simpleTable(data,caption))
+    return(backgroundSubtracted())
   })
 
   plots[["background subtracted"]] = reactive({
@@ -600,12 +633,18 @@ shinyServer(function(input,output) {
     return(p)
   })
 
+
   tables[["background subtracted"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtracted()
     caption <- paste0("Background subtracted ",input$label)
     caption <- paste0(caption," over time")
     return(simpleTable(wellsData,caption))
+  })
+
+  dataframe[["background subtracted log"]] <- reactive({
+    if(is.null(wells())) { return() }
+    return(backgroundSubtractedLog())
   })
 
   plots[["background subtracted log"]] = reactive({
@@ -632,6 +671,18 @@ shinyServer(function(input,output) {
     return(simpleTable(wellsData,caption))
   })
 
+  growthRateData <- reactive({
+    if(is.null(wells())) { return() }
+    data <- wideRollingWindowRegression()
+    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
+    cols <- colnames(data)
+    data <- data[c("Time",cols[cols != "Time"])]
+    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
+    return(data)
+  })
+
+  dataframe[["growth rate vs. time"]] <- growthRateData
+
   plots[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()    
@@ -654,17 +705,15 @@ shinyServer(function(input,output) {
 
   growthRateTable = reactive({
     if(is.null(wells())) { return() }
-    data <- wideRollingWindowRegression()
-    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
-    cols <- colnames(data)
-    data <- data[c("Time",cols[cols != "Time"])]
-    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
+    data <- growthRateData()
     sketch <- structuredTableSketch(data,input$label,'Growth')
     caption <- paste0("Growth rate based on ",input$label)
     return(datatable(data,container = sketch,rownames=FALSE,caption = caption))
   })
 
   tables[["growth rate vs. time"]] = growthRateTable
+
+  dataframe[["growth rate vs. value"]] <- growthRateData
 
   plots[["growth rate vs. value"]] = reactive({
     if(is.null(wells())) { return() }
@@ -692,6 +741,18 @@ shinyServer(function(input,output) {
   
   grToDt <- function(x) {return(log(2)*60/x)}
   
+  doublingTimeData <- reactive ({
+    if(is.null(wells())) { return() }
+    data <- wideDTRegression()
+    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
+    cols <- colnames(data)
+    data <- data[c("Time",cols[cols != "Time"])]
+    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
+    return(data)
+  })
+
+  dataframe[["doubling time vs. time"]] = doublingTimeData
+
   plots[["doubling time vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- dtRegression()
@@ -713,19 +774,16 @@ shinyServer(function(input,output) {
     return(seriesChart(ggplotdata,"time [h]","doubling time [min]",timeLimits(),c(-10,as.numeric(input$maxdtime))))
   })
 
-  doublingTimeTable = reactive({
-    if(is.null(wells())) { return() }
-    data <- wideDTRegression()
-    is.na(data) <- do.call(cbind,lapply(data,is.infinite))
-    cols <- colnames(data)
-    data <- data[c("Time",cols[cols != "Time"])]
-    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
+  doublingTimeTable <- reactive({
+    data <- doublingTimeData()
     sketch <- structuredTableSketch(data,input$label,'Doubling time')
     caption <- paste0("Doubling time [min] based on ",input$label)
     return(datatable(data,container = sketch,rownames=FALSE,caption = caption))
   })
 
   tables[["doubling time vs. time"]] = doublingTimeTable
+
+  dataframe[["doubling time vs. value"]] = doublingTimeData
 
   plots[["doubling time vs. value"]] = reactive({
     if(is.null(wells())) { return() }
