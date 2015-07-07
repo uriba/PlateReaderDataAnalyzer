@@ -14,9 +14,9 @@
 #tooltip help
 #display (interactive?) plate layout
 #support multiple plate layout styles/files
-#add links to download/use sample files
 #accelerate by using reactive melted data and manipulate it.
 #reduce size of table number presentation
+#condiser dropping non-interactive plots and avoid melts
 
 library(shiny)
 library(gdata)
@@ -31,6 +31,7 @@ library(DT)
 source('tecanProcess.R')
 
 max_plots <- 10
+addResourcePath("sample","sample")
 
 shinyServer(function(input,output) {
   MultifileData <- reactive({
@@ -335,10 +336,6 @@ shinyServer(function(input,output) {
   rawChart <- function(label,plotData,wellsDesc) {
       ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
       ggplotdata$val <- ggplotdata$Time
-      ggplotdata$label <- ggplotdata$variable
-      if(! is.null(wellsDesc)) {
-        ggplotdata$label = wellsDesc[as.character(ggplotdata$variable)]
-      }
       return(seriesChart(ggplotdata,"time [h]",label,NULL,NULL))
   }
 
@@ -747,7 +744,6 @@ shinyServer(function(input,output) {
     is.na(data) <- do.call(cbind,lapply(data,is.infinite))
     cols <- colnames(data)
     data <- data[c("Time",cols[cols != "Time"])]
-    data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
     return(data)
   })
 

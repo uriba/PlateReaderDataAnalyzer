@@ -87,21 +87,29 @@ shinyUI(fluidPage(
         includeHTML("welcome.html")
         ),
       conditionalPanel(
-        condition='output.fileUploaded && (input.analysisType == "Growth rate analysis")', 
-        h3("Growth rate analysis")
-        ),
-      conditionalPanel(
-        condition='output.fileUploaded && (input.analysisType == "Plate overview")', 
-        h3("Plate overview")
-        ),
-      conditionalPanel(
-        condition='(input.analysisType == "Plate overview") || (input.analysisType == "Growth rate analysis")', 
-        htmlOutput("plots")
-        ),
-      conditionalPanel(
-        condition='input.analysisType == "Plotly test"',
-        showOutput("myChart","highcharts")
+        condition="output.fileUploaded",
+        tabsetPanel(
+          tabPanel("About",includeHTML("welcome.html")),
+          tabPanel("Data analysis",
+             conditionalPanel(
+              condition='output.fileUploaded && (input.analysisType == "Growth rate analysis")', 
+              h3("Growth rate analysis")
+              ),
+            conditionalPanel(
+              condition='output.fileUploaded && (input.analysisType == "Plate overview")', 
+              h3("Plate overview")
+              ),
+            conditionalPanel(
+              condition='(input.analysisType == "Plate overview") || (input.analysisType == "Growth rate analysis")', 
+              htmlOutput("plots")
+              ),
+            conditionalPanel(
+              condition='input.analysisType == "Plotly test"',
+              showOutput("myChart","highcharts")
+              )),
+          tabPanel("Plate layout",h3("Coming soon: plate layout display")),
+          id="tabDisplay",selected="Data analysis"
         )
-      )    
+    ))    
     )
   ))
