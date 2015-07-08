@@ -15,7 +15,6 @@
 #display (interactive?) plate layout
 #support multiple plate layout styles/files
 #accelerate by using reactive melted data and manipulate it.
-#reduce size of table number presentation
 #condiser dropping non-interactive plots and avoid melts
 
 library(shiny)
@@ -150,13 +149,13 @@ shinyServer(function(input,output) {
       }
     }      
     wellsData[,"Time"] = labelData$Time
-    return(wellsData[,c("Time",wells())])
+    return(signif(wellsData[,c("Time",wells())],3))
   })
   
   backgroundSubtractedLog <- reactive({
     bgSubtracted <- backgroundSubtracted()
     bgSubtracted[,wells()] <- lapply(bgSubtracted[,wells(),drop=FALSE],log)
-    return(bgSubtracted)
+    return(signif(bgSubtracted,3))
   })  
   
   timeLimits <- reactive({
@@ -451,6 +450,7 @@ shinyServer(function(input,output) {
           if(my_i>length(names(Data()))) {return ()}
           label <- names(Data())[my_i]
           data <- Data()[[label]][,c("Time",wells())]
+          data <- signif(data,3)
           caption <- paste0(label," values over time")
           if(!is.null(WellsDesc())) {
             sketch <- simpleTableSketch(data)
@@ -590,7 +590,7 @@ shinyServer(function(input,output) {
     if(is.null(wells())) { return() }
     label <- input$label
     data <- Data()[[label]]
-    data <- data[,c("Time",wells())]
+    data <- signif(data[,c("Time",wells())],3)
   })
 
   plots[["raw"]] <- reactive({
@@ -675,7 +675,7 @@ shinyServer(function(input,output) {
     cols <- colnames(data)
     data <- data[c("Time",cols[cols != "Time"])]
     data[,c(grep("vals",colnames(data)))] <- lapply(data[,c(grep("vals",colnames(data)))],exp)
-    return(data)
+    return(signif(data,3))
   })
 
   dataframe[["growth rate vs. time"]] <- growthRateData
@@ -744,7 +744,7 @@ shinyServer(function(input,output) {
     is.na(data) <- do.call(cbind,lapply(data,is.infinite))
     cols <- colnames(data)
     data <- data[c("Time",cols[cols != "Time"])]
-    return(data)
+    return(signif(data,3))
   })
 
   dataframe[["doubling time vs. time"]] = doublingTimeData
