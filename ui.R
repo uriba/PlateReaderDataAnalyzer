@@ -1,5 +1,6 @@
 library(shiny)
 library(shinyBS)
+library(DT)
 require(rCharts)
 
 shinyUI(fluidPage(
@@ -107,7 +108,9 @@ shinyUI(fluidPage(
               condition='input.analysisType == "Plotly test"',
               showOutput("myChart","highcharts")
               )),
-          tabPanel("Plate layout",h3("Coming soon: plate layout display")),
+          tabPanel("Plate layout",
+              DT::dataTableOutput('layoutTable')
+            ),
           id="tabDisplay",selected="Data analysis"
         )
     ))    

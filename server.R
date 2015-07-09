@@ -408,6 +408,19 @@ shinyServer(function(input,output) {
                                         ))
     return(sketch)
   }
+
+  output$layoutTable <- DT::renderDataTable({
+    data <- data.frame(row.names = rows())
+    for (col in columns())
+    for (row in rows()) {
+        data[row,col] <- paste0(row,col)
+        if(! is.null(WellsDesc())) {
+          data[row,col] <- WellsDesc()[paste0(row,col)]
+        }
+      }
+    data = data[,as.character(sort(as.numeric(colnames(data))))]
+    return(data)
+  })
  
   for (i in 1:max_plots) { # generate plots for all the labels (up to 10 labels are allowed)
     local({
