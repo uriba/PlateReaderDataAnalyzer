@@ -1,6 +1,7 @@
 library(shiny)
 library(shinyBS)
 library(DT)
+library(rhandsontable)
 require(rCharts)
 
 shinyUI(fluidPage(
@@ -109,7 +110,7 @@ shinyUI(fluidPage(
               showOutput("myChart","highcharts")
               )),
           tabPanel("Plate layout",
-              DT::dataTableOutput('layoutTable')
+              rHandsontableOutput('layoutTable')
             ),
           id="tabDisplay",selected="Data analysis"
         )

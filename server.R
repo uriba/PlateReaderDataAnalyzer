@@ -1,18 +1,17 @@
 #ToDo:
-#Integrate plot.ly as choice for output for export (given username and authentication key).
-#find way to use multiple columns in plot.ly legend.
 #Add update plots button?
 #Color code input types + collapsable for cleaner UI.
-#Add help and documentation to web page
-#Add plots for expression levels
+#Add plots for expression levels:
 ## selection of channels
 ## selection of background method per channel
 ## available graphs: fluorescence / od
 ## fluorescence change / od change (where the cells aim to)
 ## fluorescence change / od (rate of production).
+#add plot.ly integration:
+##Integrate plot.ly as choice for output for export (given username and authentication key).
+##find way to use multiple columns in plot.ly legend.
 #Set clear headlines for page according to analysis types
 #tooltip help
-#display (interactive?) plate layout
 #support multiple plate layout styles/files
 #accelerate by using reactive melted data and manipulate it.
 #condiser dropping non-interactive plots and avoid melts
@@ -26,6 +25,7 @@ library(plotly)
 library(rCharts)
 library(foreach)
 library(DT)
+library(rhandsontable)
 
 source('tecanProcess.R')
 
@@ -179,7 +179,7 @@ shinyServer(function(input,output) {
     regs.long$ymax <- regs.long$value+regs.long$se
     regs.long$ymin <- regs.long$value-regs.long$se
     regs.long$label <- regs.long$variable
-    wellsDesc <- WellsDesc()
+    wellsDesc <- layout()
     if(! is.null(wellsDesc)) {
         regs.long$label = wellsDesc[as.character(regs.long$variable)]
     }
@@ -352,7 +352,7 @@ shinyServer(function(input,output) {
    }
 
   simpleTableSketch <- function(data) {
-    wellsDesc <- WellsDesc()
+    wellsDesc <- layout()
     wellsDesc <- wellsDesc[wells()]
     labels <- unique(wellsDesc)
     cols <- c()
@@ -374,7 +374,7 @@ shinyServer(function(input,output) {
 
   structuredTableSketch <- function(data,label,stat) {
     cols <- wells()
-    wellsDesc <- WellsDesc()
+    wellsDesc <- layout()
     noLabels <- is.null(wellsDesc)
     if(!noLabels) {
       wellsDesc <- wellsDesc[wells()]
@@ -409,19 +409,37 @@ shinyServer(function(input,output) {
     return(sketch)
   }
 
-  output$layoutTable <- DT::renderDataTable({
+  output$layoutTable <- renderRHandsontable({
     data <- data.frame(row.names = rows())
     for (col in columns())
-    for (row in rows()) {
+      for (row in rows()) {
         data[row,col] <- paste0(row,col)
         if(! is.null(WellsDesc())) {
-          data[row,col] <- WellsDesc()[paste0(row,col)]
+          data[row,col] <- layout()[paste0(row,col)]
         }
       }
     data = data[,as.character(sort(as.numeric(colnames(data))))]
-    return(data)
+    return(rhandsontable(data, readOnly = FALSE))
   })
- 
+
+  layout <- function()
+  {
+    wellsDesc <- tableToDesc(input$layoutTable$params$data)
+    if(is.null(wellsDesc))
+       wellsDesc <- WellsDesc()
+    return(wellsDesc)
+  }
+
+  tableToDesc <- function(desc) {
+    if(is.null(desc)) return(NULL)
+    ret <- c()
+    cols = sort(as.numeric(columns()))
+    for(i in 1:length(rows()))
+      for(j in 1:length(cols))
+        ret[paste0(rows()[i],cols[j])] <- desc[[i]][[j]]
+    return(ret)
+  }
+
   for (i in 1:max_plots) { # generate plots for all the labels (up to 10 labels are allowed)
     local({
       my_i <- i
@@ -431,7 +449,8 @@ shinyServer(function(input,output) {
           if(my_i>length(names(Data()))) {return ()}
           label <- names(Data())[my_i]
           plotData <- Data()[[label]]    
-          return(rawPlot(label,plotData[,c("Time",wells())],WellsDesc()))
+          wellsDesc <- layout()
+          return(rawPlot(label,plotData[,c("Time",wells())],wellsDesc))
         }
         else if(input$analysisType =="Growth rate analysis") {
           if(my_i>length(input$grPlots)) {return ()}
@@ -445,7 +464,7 @@ shinyServer(function(input,output) {
           if(my_i>length(names(Data()))) {return ()}
           label <- names(Data())[my_i]
           plotData <- Data()[[label]]    
-          p <- rawChart(label,plotData[,c("Time",wells())],WellsDesc())
+          p <- rawChart(label,plotData[,c("Time",wells())],layout())
           p$set(dom=paste0("chart",my_i))
           return(p)
         }
@@ -465,7 +484,7 @@ shinyServer(function(input,output) {
           data <- Data()[[label]][,c("Time",wells())]
           data <- signif(data,3)
           caption <- paste0(label," values over time")
-          if(!is.null(WellsDesc())) {
+          if(!is.null(layout())) {
             sketch <- simpleTableSketch(data)
             d <- datatable(data, container = sketch,rownames = FALSE,caption = caption)
           } else {
@@ -536,7 +555,7 @@ shinyServer(function(input,output) {
   })
 
   simpleTable <- function(data,caption) {
-    wellsDesc <- WellsDesc()
+    wellsDesc <- layout()
     if(!is.null(wellsDesc)) {
       sketch <- simpleTableSketch(data)
       return(datatable(data,container = sketch,rownames=FALSE,caption = caption))
@@ -549,7 +568,7 @@ shinyServer(function(input,output) {
     plotData <- plotData[is.finite(plotData$value),]
     plotData$variable <- as.character(plotData$variable)
     plotData$label <- plotData$variable
-    wellsDesc <- WellsDesc()
+    wellsDesc <- layout()
     if(! is.null(wellsDesc)) {
       plotData$label <- wellsDesc[plotData$variable]
       plotData[,"variable"] <- lapply(plotData[,"variable",drop=FALSE],function(x) {paste(x, wellsDesc[x],sep=" - ")})
@@ -610,12 +629,12 @@ shinyServer(function(input,output) {
     if(is.null(wells())) { return() }
     label <- input$label
     plotData <- Data()[[label]]
-    return(rawPlot(label,plotData[,c("Time",wells())],WellsDesc()))
+    return(rawPlot(label,plotData[,c("Time",wells())],layout()))
   })
 
   charts[["raw"]] <- reactive({
     if(is.null(wells())) { return() }
-    return(rawChart(input$label,dataframe[["raw"]](),WellsDesc()))
+    return(rawChart(input$label,dataframe[["raw"]](),layout()))
   })
 
   tables[["raw"]] <- reactive({
@@ -631,13 +650,13 @@ shinyServer(function(input,output) {
   plots[["background subtracted"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtracted()
-    return(rawPlot(input$label,wellsData,WellsDesc()) + scale_x_continuous(limits=timeLimits()))
+    return(rawPlot(input$label,wellsData,layout()) + scale_x_continuous(limits=timeLimits()))
   })
 
   charts[["background subtracted"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtracted()
-    p <-rawChart(input$label,wellsData,WellsDesc())
+    p <-rawChart(input$label,wellsData,layout())
     limits <- timeLimits()
     p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
     return(p)
@@ -660,13 +679,13 @@ shinyServer(function(input,output) {
   plots[["background subtracted log"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()
-    return(rawPlot(paste0("log ",input$label),wellsData,WellsDesc()) + scale_x_continuous(limits=timeLimits()))
+    return(rawPlot(paste0("log ",input$label),wellsData,layout()) + scale_x_continuous(limits=timeLimits()))
   })
 
   charts[["background subtracted log"]] = reactive({
     if(is.null(wells())) { return() }
     wellsData <- backgroundSubtractedLog()
-    p <- rawChart(paste0("log ",input$label),wellsData,WellsDesc())
+    p <- rawChart(paste0("log ",input$label),wellsData,layout())
     limits <- timeLimits()
     p$xAxis(title=list(text="time [h]"),floor=limits[1],ceiling=limits[2])
     return(p)
