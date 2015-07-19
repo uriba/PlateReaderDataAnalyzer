@@ -23,12 +23,17 @@ shinyUI(fluidPage(
         selectInput(
           inputId = "wellsToAnalyse",
           label = "Wells to analyse",
-          choices = c("Whole plate","Row","Column","Wells"),
+          choices = c("Whole plate","Row","Column","Match","Wells"),
           selected = 1),
         conditionalPanel(
           condition='input.wellsToAnalyse == "Wells"',
-        bsTooltip(id="wells",title="Comma seperated, case sensitive list of one or more wells",placement="right", trigger="hover"),
+          bsTooltip(id="wells",title="Comma seperated, case sensitive list of one or more wells",placement="right", trigger="hover"),
           textInput("wells","Wells to analyse",value="A1")
+        ),
+        conditionalPanel(
+          condition='input.wellsToAnalyse == "Match"',
+          bsTooltip(id="match",title="Regular expression to match",placement="right", trigger="hover"),
+          textInput("match","Expression to match for wells to analyse",value="A1")
         ),
         conditionalPanel(
           condition='input.wellsToAnalyse == "Row"',

@@ -111,6 +111,15 @@ shinyServer(function(input,output) {
       if(is.null(input$column)) { return() }
       cols <- cols[grep(paste0("[A-Z]",input$column,"$"),cols)]      
     }
+    if(input$wellsToAnalyse == "Match") {
+      if(is.null(input$match)) { return() }
+      wellsdesc <- layout()
+      if(is.null(wellsdesc)) {
+        cols <- cols[grep(input$match,cols)]
+      } else {
+        cols <- names(wellsdesc[grep(input$match,wellsdesc)])
+      }
+    }
     return(cols)
   })
   
