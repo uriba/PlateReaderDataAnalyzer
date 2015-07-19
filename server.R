@@ -245,7 +245,7 @@ shinyServer(function(input,output) {
   output$fileUploaded <- reactive ({
     return (! is.null(Data()))
   })
-  
+
   outputOptions(output,'fileUploaded',suspendWhenHidden=FALSE)
   outputOptions(output,'MultiFile',suspendWhenHidden=FALSE)
 
