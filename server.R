@@ -18,7 +18,6 @@
 
 library(shiny)
 library(gdata)
-library(ggplot2)
 library(reshape2)
 library(zoo)
 library(plotly)
@@ -309,10 +308,7 @@ shinyServer(function(input,output) {
     plots_list <- lapply(1:plotsNum,function(i){
                          plotstylename <- paste0("plotstyle",i)
                          downloadButtonName <- paste0("download",i)
-                         if(is.null(input[[plotstylename]]) || input[[plotstylename]] == "standard") {
-                             plot = plotOutput(paste0("plot",i))
-                         }
-                         else if(input[[plotstylename]] == "interactive") {
+                         if(is.null(input[[plotstylename]]) || input[[plotstylename]] == "plot") {
                              plot = showOutput(paste0("chart",i),"highcharts")
                          }
                          else if(input[[plotstylename]] == "table") {
@@ -322,24 +318,6 @@ shinyServer(function(input,output) {
     })
     do.call(tagList,plots_list)    
   })
-
-  simplePlot <- function(label,data) {
-    pd = position_dodge(0.1)
-    return (ggplot(data=data,aes(x=Time,y=value,colour=label,group=variable))+
-      geom_point(position=pd)+geom_line(position=pd)+
-      guides(colour=guide_legend(title="Well",nrow=20))+
-      xlab("time [h]")+
-      ylab(label))
-  }
-
-  rawPlot <- function(label,plotData,wellsDesc) {
-      ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-      ggplotdata$label <- ggplotdata$variable
-      if(! is.null(wellsDesc)) {
-        ggplotdata$label <- wellsDesc[as.character(ggplotdata$variable)]
-      }
-      return(simplePlot(label,ggplotdata))
-  }
 
   rawChart <- function(label,plotData,wellsDesc) {
       ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
@@ -355,7 +333,7 @@ shinyServer(function(input,output) {
         selectInput(
                 inputId = plotstylename,
                 label = "Display",
-                choices = c("standard","interactive","table"),
+                choices = c("plot","table"),
                 selected = input[[plotstylename]])})
      })
    }
@@ -452,21 +430,6 @@ shinyServer(function(input,output) {
   for (i in 1:max_plots) { # generate plots for all the labels (up to 10 labels are allowed)
     local({
       my_i <- i
-      output[[paste0("plot",my_i)]] <- renderPlot({
-        if(is.null(wells())) { return() }
-        if(input$analysisType == "Plate overview") {
-          if(my_i>length(names(Data()))) {return ()}
-          label <- names(Data())[my_i]
-          plotData <- Data()[[label]]    
-          wellsDesc <- layout()
-          return(rawPlot(label,plotData[,c("Time",wells())],wellsDesc))
-        }
-        else if(input$analysisType =="Growth rate analysis") {
-          if(my_i>length(input$grPlots)) {return ()}
-          return(plots[[input$grPlots[my_i]]]())
-        }
-      })
-
       output[[paste0("chart",my_i)]] <- renderChart({
         if(is.null(wells())) { return() }
         if(input$analysisType == "Plate overview") {
@@ -634,13 +597,6 @@ shinyServer(function(input,output) {
     data <- signif(data[,c("Time",wells())],3)
   })
 
-  plots[["raw"]] <- reactive({
-    if(is.null(wells())) { return() }
-    label <- input$label
-    plotData <- Data()[[label]]
-    return(rawPlot(label,plotData[,c("Time",wells())],layout()))
-  })
-
   charts[["raw"]] <- reactive({
     if(is.null(wells())) { return() }
     return(rawChart(input$label,dataframe[["raw"]](),layout()))
@@ -654,12 +610,6 @@ shinyServer(function(input,output) {
   dataframe[["background subtracted"]] <- reactive({
     if(is.null(wells())) { return() }
     return(backgroundSubtracted())
-  })
-
-  plots[["background subtracted"]] = reactive({
-    if(is.null(wells())) { return() }
-    wellsData <- backgroundSubtracted()
-    return(rawPlot(input$label,wellsData,layout()) + scale_x_continuous(limits=timeLimits()))
   })
 
   charts[["background subtracted"]] = reactive({
@@ -683,12 +633,6 @@ shinyServer(function(input,output) {
   dataframe[["background subtracted log"]] <- reactive({
     if(is.null(wells())) { return() }
     return(backgroundSubtractedLog())
-  })
-
-  plots[["background subtracted log"]] = reactive({
-    if(is.null(wells())) { return() }
-    wellsData <- backgroundSubtractedLog()
-    return(rawPlot(paste0("log ",input$label),wellsData,layout()) + scale_x_continuous(limits=timeLimits()))
   })
 
   charts[["background subtracted log"]] = reactive({
@@ -721,19 +665,6 @@ shinyServer(function(input,output) {
 
   dataframe[["growth rate vs. time"]] <- growthRateData
 
-  plots[["growth rate vs. time"]] = reactive({
-    if(is.null(wells())) { return() }
-    ggplotdata <- rollingWindowRegression()    
-    pd = position_dodge(0.1)
-    p <- simplePlot("growth rate",ggplotdata)
-    if(input$errorBars) {
-      p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
-    }
-    p <- p+ scale_y_continuous(limits=c(-0.1,NA))+
-      scale_x_continuous(limits=timeLimits())
-    return(p)
-  })
-  
   charts[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- rollingWindowRegression()    
@@ -752,22 +683,6 @@ shinyServer(function(input,output) {
   tables[["growth rate vs. time"]] = growthRateTable
 
   dataframe[["growth rate vs. value"]] <- growthRateData
-
-  plots[["growth rate vs. value"]] = reactive({
-    if(is.null(wells())) { return() }
-    ggplotdata <- rollingWindowRegression()
-    pd = position_dodge(0.1)
-    p <- ggplot(data=ggplotdata,aes(x=val,y=value,colour=label,group=variable))
-    if(input$errorBars) {
-      p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
-    }
-    p <- p+geom_point(position=pd)+geom_line(position=pd)+
-      guides(colour=guide_legend(title="Well",nrow=20))+
-      scale_y_continuous(limits=c(-0.1,NA))+
-      xlab(paste0("log ",input$label))+
-      ylab("growth rate")
-    return(p)
-  })
 
   charts[["growth rate vs. value"]] = reactive({
     if(is.null(wells())) { return() }
@@ -790,20 +705,6 @@ shinyServer(function(input,output) {
 
   dataframe[["doubling time vs. time"]] = doublingTimeData
 
-  plots[["doubling time vs. time"]] = reactive({
-    if(is.null(wells())) { return() }
-    ggplotdata <- dtRegression()
-  
-    pd = position_dodge(0.1)
-    p <- simplePlot("doubling time [min]",ggplotdata)
-    if(input$errorBars) {
-      p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
-    }    
-    p <- p+ scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
-      scale_x_continuous(limits=timeLimits())
-    return(p)  
-  })
-
   charts[["doubling time vs. time"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- dtRegression()
@@ -822,23 +723,6 @@ shinyServer(function(input,output) {
 
   dataframe[["doubling time vs. value"]] = doublingTimeData
 
-  plots[["doubling time vs. value"]] = reactive({
-    if(is.null(wells())) { return() }
-    ggplotdata <- dtRegression()
-    
-    pd = position_dodge(0.1)
-    p <- ggplot(data=ggplotdata,aes(x=val,y=value,colour=label,group=variable))
-    if(input$errorBars) {
-      p <- p+geom_errorbar(aes(ymax=ymax,ymin=ymin),width=.1,position=pd)
-    }    
-    p <- p+geom_point(position=pd)+geom_line(position=pd)+
-      guides(colour=guide_legend(title="Well",nrow=20))+
-      scale_y_continuous(limits=c(-10,as.numeric(input$maxdtime)))+
-      xlab(paste0("log ",input$label))+
-      ylab("doubling time [min]")
-    return(p)  
-  })
-  
   charts[["doubling time vs. value"]] = reactive({
     if(is.null(wells())) { return() }
     ggplotdata <- dtRegression()
