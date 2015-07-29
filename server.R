@@ -11,10 +11,8 @@
 ##Integrate plot.ly as choice for output for export (given username and authentication key).
 ##find way to use multiple columns in plot.ly legend.
 #Set clear headlines for page according to analysis types
-#tooltip help
 #support multiple plate layout styles/files
-#accelerate by using reactive melted data and manipulate it.
-#condiser dropping non-interactive plots and avoid melts
+#add progress bar for plots
 
 library(shiny)
 library(gdata)
@@ -173,27 +171,6 @@ shinyServer(function(input,output) {
     return(c(timesRange[1]-0.05*delta,timesRange[2]+0.05*delta))
   })
   
-  rollingWindowRegression <- reactive({
-    regs <- wideRollingWindowRegression() 
-    std_errs = grep("std_err$",colnames(regs),value=TRUE)
-    vals = grep("vals$",colnames(regs),value=TRUE)
-    
-    regs.long <- melt(regs,id.vars=c(std_errs,vals,"Time"))# Reformat the data to be appropriate for multi line plot
-    regs.long[,c('se','val')]=1 #assign standard error and value of measurement where regression was taken
-    for (col in wells()) {
-      regs.long[which(regs.long$variable==col),'se']=regs.long[which(regs.long$variable==col),paste0(col,".std_err")]
-      regs.long[which(regs.long$variable==col),'val']=regs.long[which(regs.long$variable==col),paste0(col,".vals")]
-    }
-    regs.long$ymax <- regs.long$value+regs.long$se
-    regs.long$ymin <- regs.long$value-regs.long$se
-    regs.long$label <- regs.long$variable
-    wellsDesc <- layout()
-    if(! is.null(wellsDesc)) {
-        regs.long$label = wellsDesc[as.character(regs.long$variable)]
-    }
-    return(regs.long)
-  })
-
   wideRollingWindowRegression <- reactive({
     reg <- function(window) {
       cols <- colnames(window)
@@ -201,20 +178,23 @@ shinyServer(function(input,output) {
       window <- as.data.frame(window)
       res <- list()
       for(col in cols) {
+        stderrname <- paste0(col,'.std_err')
         data <- window[,col]
         times <- window[,"Time"]
         times <- times[is.finite(data)]
         data <- data[is.finite(data)]
         res[paste0(col,'.vals')]<-  mean(data)
         res[col] <- NA
-        res[paste0(col,'.std_err')]<- NA
-        if(length(data)>1) {
+        res[stderrname]<- NA
+        if(length(data)>2) {
           c <- lm(data ~ times)
           rsq = summary(c)$r.squared
           if(!is.na(rsq) && rsq > as.numeric(input$rsquare)) {
             res[col] <- (summary(c)$coefficients)["times","Estimate"]
           }
-          res[paste0(col,'.std_err')]<-summary(c)$coefficients["times","Std. Error"]  
+          res[stderrname]<-summary(c)$coefficients["times","Std. Error"]
+          res[ymin(col)]<-as.numeric(res[col])-as.numeric(res[stderrname])
+          res[ymax(col)]<-as.numeric(res[col])+as.numeric(res[stderrname])
         }
       }
       return(res)
@@ -241,12 +221,6 @@ shinyServer(function(input,output) {
       plotData[,well] <- dts
       plotData[,stderr] <- abs(maxs+mins)/2
     }
-    return (plotData)
-  })
-
-  dtRegression <- reactive({
-    plotData <- rollingWindowRegression()
-    plotData[,c('value','ymax','ymin')] <- lapply(plotData[,c('value','ymax','ymin')],grToDt)
     return (plotData)
   })
 
@@ -320,9 +294,7 @@ shinyServer(function(input,output) {
   })
 
   rawChart <- function(label,plotData,wellsDesc) {
-      ggplotdata <- melt(plotData,id="Time") # Reformat the data to be appropriate for multi line plot
-      ggplotdata$val <- ggplotdata$Time
-      return(seriesChart(ggplotdata,"time [h]",label,NULL,NULL))
+      return(wideSeriesChart(plotData,"time [h]",label,NULL,NULL))
   }
 
    for (i in 1:max_plots) {
@@ -536,16 +508,18 @@ shinyServer(function(input,output) {
     }
   }
 
-  seriesChart <- function(plotData,xlabel,ylabel,xlimits,ylimits) {
-    plotData <- plotData[is.finite(plotData$value),]
-    plotData$variable <- as.character(plotData$variable)
-    plotData$label <- plotData$variable
+  wideSeriesChart <- function(plotData,xlabel,ylabel,xlimits,ylimits,xsuffix = NULL) {
+    wellnames <- wells()
+    seriestitles <- wellnames
+    labels <- wellnames
     wellsDesc <- layout()
     if(! is.null(wellsDesc)) {
-      plotData$label <- wellsDesc[plotData$variable]
-      plotData[,"variable"] <- lapply(plotData[,"variable",drop=FALSE],function(x) {paste(x, wellsDesc[x],sep=" - ")})
+      labels <- wellsDesc[wellnames]
+      seriestitles <- lapply(wellnames,function(x) {paste(x, wellsDesc[x],sep=" - ")})
     }
-    groups = unique(plotData$label)
+    names(seriestitles) <- wellnames
+    names(labels) <- wellnames
+    groups = unique(labels)
     colorNum <- length(groups)
 
     p <- Highcharts$new()
@@ -556,35 +530,45 @@ shinyServer(function(input,output) {
     p$xAxis(title=list(text=xlabel),floor=xlimits[1],ceiling=xlimits[2])
     p$yAxis(title=list(text=ylabel),floor=ylimits[1],ceiling=ylimits[2])
     p$plotOptions(scatter = list(lineWidth=1,marker=list(radius=2,symbol='circle')))
-    splitted <- split(plotData,plotData$variable)
-    series <- foreach(group = names(splitted),.combine=append) %do% {
-      wellData <- splitted[[group]]
-      if(nrow(wellData) == 0) return(NULL)
+    series <- foreach(group = wellnames,.combine=append) %do% {
+      wellData <- plotData[[group]]
+      if(is.null(xsuffix)) {
+        xs <- plotData$Time
+      } else {
+        xs <- plotData[[paste0(group,xsuffix)]]
+      }
+      idx <- is.finite(wellData)
+      xs <- xs[idx]
+      wellData <- wellData[idx]
+      if(length(wellData) == 0) return(NULL)
       append(
         list(
             list(
-                 name=group,
+                 name=as.character(seriestitles[group]),
                  type='scatter',
-                 color=colors[groups == wellData$label[1]],
-                 data=foreach(i=1:nrow(wellData)) %do% {
-                   return(c(wellData$val[i],wellData$value[i]))
+                 color=colors[groups == labels[group]],
+                 data=foreach(i=1:length(wellData)) %do% {
+                   return(c(xs[i],wellData[i]))
                  }
-            )),if(input$errorBars)
+            )),if(input$errorBars){
+        mins <- plotData[[ymin(group)]]
+        mins <- mins[idx]
+        maxs <- plotData[[ymax(group)]]
+        maxs <- maxs[idx]
         list(
           list(
-               name=group,
+               name=as.character(seriestitles[group]),
                type='errorbar',
-               data=foreach(i=1:nrow(wellData)) %do% {
-                 return(c(wellData$val[i],c(wellData$ymin[i],
-                                             wellData$ymax[i])))
+               data=foreach(i=1:length(wellData)) %do% {
+                 return(c(xs[i],c(mins[i],maxs[i])))
                }
-          )) else NULL
+          ))} else NULL
       )
     }
     p$series(series)
     return(p)
   }
-  
+
   plots <- list()
   charts <- list()
   tables <- list()
@@ -667,9 +651,8 @@ shinyServer(function(input,output) {
 
   charts[["growth rate vs. time"]] = reactive({
     if(is.null(wells())) { return() }
-    ggplotdata <- rollingWindowRegression()    
-    ggplotdata$val <- ggplotdata$Time
-    return(seriesChart(ggplotdata,"time [h]","growth rate",timeLimits(),c(-0.1)))
+    plotdata <- wideRollingWindowRegression()
+    return(wideSeriesChart(plotdata,"time [h]","growth rate",timeLimits(),c(-0.1)))
   })
 
   growthRateTable = reactive({
@@ -686,13 +669,34 @@ shinyServer(function(input,output) {
 
   charts[["growth rate vs. value"]] = reactive({
     if(is.null(wells())) { return() }
-    ggplotdata <- rollingWindowRegression()
-    return(seriesChart(ggplotdata,paste0("log ",input$label),"growth rate",NULL,c(-0.1)))
+    plotdata <- wideRollingWindowRegression()
+    return(wideSeriesChart(plotdata,paste0("log ",input$label),"growth rate",NULL,c(-0.1),xsuffix = ".vals"))
   })
 
   tables[["growth rate vs. value"]] = growthRateTable
   
   grToDt <- function(x) {return(log(2)*60/x)}
+
+  ymax <- function(well) {
+    return(paste0(well,".ymax"))
+  }
+
+  ymin <- function(well) {
+    return(paste0(well,".ymin"))
+  }
+
+  grToDtFrame <- function(x) {
+    for(well in wells()) {
+      x[,well] <- as.numeric(lapply(x[,well],grToDt))
+      ymax <- ymax(well)
+      ymin <- ymin(well)
+      if(ymax %in% colnames(x)) {
+        x[,ymax] <- as.numeric(lapply(x[,ymax],grToDt))
+        x[,ymin] <- as.numeric(lapply(x[,ymin],grToDt))
+      }
+    }
+    return(x)
+  }
   
   doublingTimeData <- reactive ({
     if(is.null(wells())) { return() }
@@ -707,9 +711,8 @@ shinyServer(function(input,output) {
 
   charts[["doubling time vs. time"]] = reactive({
     if(is.null(wells())) { return() }
-    ggplotdata <- dtRegression()
-    ggplotdata$val <- ggplotdata$Time
-    return(seriesChart(ggplotdata,"time [h]","doubling time [min]",timeLimits(),c(-10,as.numeric(input$maxdtime))))
+    plotdata <- grToDtFrame(wideRollingWindowRegression())
+    return(wideSeriesChart(plotdata,"time [h]","doubling time [min]",timeLimits(),c(-10,as.numeric(input$maxdtime))))
   })
 
   doublingTimeTable <- reactive({
@@ -725,8 +728,8 @@ shinyServer(function(input,output) {
 
   charts[["doubling time vs. value"]] = reactive({
     if(is.null(wells())) { return() }
-    ggplotdata <- dtRegression()
-    return(seriesChart(ggplotdata,paste0("log ",input$label),"doubling time [min]",NULL,c(-10,as.numeric(input$maxdtime))))
+    plotdata <- grToDtFrame(wideRollingWindowRegression())
+    return(wideSeriesChart(plotdata,paste0("log ",input$label),"doubling time [min]",NULL,c(-10,as.numeric(input$maxdtime)),".vals"))
   })
 
   tables[["doubling time vs. value"]] = doublingTimeTable
