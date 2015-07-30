@@ -1,18 +1,24 @@
 #ToDo:
 #Add update plots button?
 #Color code input types + collapsable for cleaner UI.
+
+#Add plots for enzyme activity analysis:
+## running window on background subtracted data
+
 #Add plots for expression levels:
 ## selection of channels
 ## selection of background method per channel
 ## available graphs: fluorescence / od
 ## fluorescence change / od change (where the cells aim to)
 ## fluorescence change / od (rate of production).
+
 #add plot.ly integration:
 ##Integrate plot.ly as choice for output for export (given username and authentication key).
 ##find way to use multiple columns in plot.ly legend.
+
 #Set clear headlines for page according to analysis types
-#support multiple plate layout styles/files
-#add progress bar for plots
+#Support multiple plate layout styles/files
+#Add progress bar for plots
 
 library(shiny)
 library(gdata)
