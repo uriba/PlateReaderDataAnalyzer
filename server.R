@@ -149,15 +149,16 @@ shinyServer(function(input,output) {
   })
   
   backgroundSubtracted <- reactive({
+    minval <- 0.00001
     labelData <- Data()[[input$label]]
     cols <- wells()
     wellsData <- labelData[,wells(),drop=FALSE]
     blankVals <- backgroundVals()
     for(col in cols) {
       if(col %in% names(blankVals)) {
-        wellsData[,col] <- wellsData[,col]-as.numeric(blankVals[col])        
+        wellsData[,col] <- pmax(wellsData[,col]-as.numeric(blankVals[col]),minval)
       } else {
-        wellsData[,col] <- wellsData[,col]-blankVals
+        wellsData[,col] <- pmax(wellsData[,col]-blankVals,minval)
       }
     }      
     wellsData[,"Time"] = labelData$Time
