@@ -14,17 +14,20 @@ You may want to download and run the program locally, either for development pur
 To do so you'll need, on top of the packages listed below, to install the rCharts package from github.
 In ubuntu/debian this will require installing the devtools package, which depends on libcurl.
 First we install libcurl using the shell:
-
+```bash
     apt-get -y install libcurl4-gnutls-dev
+```
 
 Then we can install devtools and rCharts:
 
+```R
     R
     >install.packages('devtools')
     >require('devtools')
     >install_github('rCharts','ramnathv')
+```
 
-The other packages the program depends on (all installable using `packages.install('...')` are:
+The other packages the program depends on (all installable using `packages.install('...')`) are:
 reshape2, gdata, shiny, shinyBS, DT, rhandsontable, zoo, foreach
 
 

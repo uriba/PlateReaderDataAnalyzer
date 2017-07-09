@@ -23,7 +23,7 @@ shinyUI(fluidPage(
         selectInput(
           inputId = "wellsToAnalyse",
           label = "Wells to analyse",
-          choices = c("Whole plate","Row","Column","Match","Wells"),
+          choices = c("Row","Column","Whole plate","Match","Wells"),
           selected = 1),
         conditionalPanel(
           condition='input.wellsToAnalyse == "Wells"',
