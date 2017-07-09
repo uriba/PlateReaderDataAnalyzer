@@ -11,7 +11,14 @@ Being an open source tool, contributors are encouraged to add other analysis typ
 
 ## Local installation
 You may want to download and run the program locally, either for development purposes, or to gain better performance.
-To do so you'll need, on top of the packages listed below, to install the rCharts package from github.
+This program uses [packrat](https://rstudio.github.io/packrat/) which should facilitate installing all the necessary dependencies.
+Once cloning to your own dir, simply start R in that directory and all the dependencies should be automatically downloaded and installed.
+
+### Local installation without packrat
+If, for some reason, packrat installation failed, or you prefer installing dependencies manually, you should install the following packages from CRAN using `install.packages('...')`:
+reshape2, gdata, shiny, shinyBS, DT, rhandsontable, zoo, foreach
+
+On top of these packages, you'll need to install the rCharts package from github.
 In ubuntu/debian this will require installing the devtools package, which depends on libcurl.
 First we install libcurl using the shell:
 ```bash
@@ -26,9 +33,4 @@ Then we can install devtools and rCharts:
     >require('devtools')
     >install_github('rCharts','ramnathv')
 ```
-
-The other packages the program depends on (all installable using `packages.install('...')`) are:
-reshape2, gdata, shiny, shinyBS, DT, rhandsontable, zoo, foreach
-
-
-
+This should conclude the installation process, you should now be able to start R and run `shiny::runApp()` to start the server locally.
