@@ -9,4 +9,23 @@ This tool currently focuses on growth rate analysis, allowing the user to tweak 
 Being an open source tool, contributors are encouraged to add other analysis types to the service.
 
 
+## Local installation
+You may want to download and run the program locally, either for development purposes, or to gain better performance.
+To do so you'll need, on top of the standard cran packages the program depends on, to install the rCharts package from github.
+On ubuntu this will require installing the devtools package, which depends on libcurl.
+First we install libcurl using the shell:
+
+    apt-get -y install libcurl4-gnutls-dev
+
+Then we can install devtools and rCharts:
+
+    R
+    >install.packages('devtools')
+    >require('devtools')
+    >install_github('rCharts','ramnathv')
+
+The other packages the program depends on are:
+reshape2, gdata, shiny, shinyBS, DT, rhandsontable, zoo, foreach
+
+
 
